@@ -1,0 +1,21 @@
+# Roblox place files (keep in Roblox Studio, not git)
+*.rbxl
+*.rbxlx
+*.rbxm
+*.rbxmx
+
+# Rojo / build outputs
+build/
+dist/
+
+# Package managers
+node_modules/
+package-lock.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+*.suo
