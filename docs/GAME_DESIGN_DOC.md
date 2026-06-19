@@ -1,125 +1,151 @@
-# Game Design Document (GDD)
+# Game Design Document — ISHIMURA
 
-> **Last Updated:** June 2026
-> **Status:** Active Development
+> **Status:** Prototyping (Phase 1)
 
 ---
 
-## 1. Game Overview
+## Overview
 
 | Field | Details |
 |-------|---------|
-| **Working Title** | ISHIMURA |
+| **Title** | ISHIMURA |
 | **Genre** | Co-op Sci-Fi Survival Horror |
 | **Platform** | Roblox |
 | **Players** | 2–4 co-op |
-| **Target Audience** | Roblox horror fans, ages 13+ |
-| **Short Description** | You and your crew respond to a distress signal on an abandoned deep-space mining vessel. The crew has been slaughtered and mutated into Necromorphs. Survive. Find the exit. Aim for the limbs. |
+| **Pitch** | You and your crew respond to a distress signal on an abandoned deep-space mining vessel. The crew has been slaughtered and mutated into Necromorphs. Survive. Find the exit. Aim for the limbs. |
 
 ---
 
-## 2. Core Gameplay Loop
+## Core Gameplay Loop
 
 ```
-Explore dark corridors → Encounter Necromorphs → Aim for limbs to dismember
-→ Manage scarce ammo/health → Revive teammates → Reach next checkpoint → Repeat
+Move through dark corridor
+  → Hear Necromorph groan (audio cue)
+  → Encounter enemy → AIM FOR LIMBS, not body
+  → Limbs removed → enemy crippled or killed
+  → Scavenge ammo/health from crates
+  → Revive downed teammate if needed
+  → Reach checkpoint → repeat
 ```
 
-The tension comes from resource scarcity, enemy aggression, and the darkness of the ship.
+**Win:** All 4 zones cleared, Reactor Core activated, team reaches escape pod.
+**Loss:** All players downed simultaneously → Game Over → return to last checkpoint.
 
 ---
 
-## 3. Mechanics
+## Dismemberment System
 
-### 3.1 Dismemberment System (Core Differentiator)
-Each Necromorph has multiple independent hit zones with their own HP:
-- **Body** — low damage, brief stagger only
-- **Arms (x2)** — remove to disarm the enemy
-- **Legs (x2)** — remove to cripple/crawl state
-- **Head** — remove for instakill
+The core differentiator. Every Necromorph has 6 independent hit zones with their own HP:
 
-Body-shot-only kills are intentionally inefficient. Players must aim strategically.
+| Part | HP (Standard) | HP (Crawler) | Effect when destroyed |
+|------|--------------|--------------|----------------------|
+| Head | 20 | 15 | Instakill |
+| LeftArm | 35 | 25 | Disarms enemy |
+| RightArm | 35 | 25 | Disarms enemy |
+| LeftLeg | 40 | 0 | Cripples (crawl) |
+| RightLeg | 40 | 0 | Cripples (crawl) |
+| Torso | 200 | 120 | Death only when depleted |
 
-**Implementation:** Multiple `Part` hitboxes per enemy model, each tracked server-side with individual HP values.
+Body shots do only 5 damage per hit. Limb shots do 18. Players **must** aim for limbs.
 
-### 3.2 Weapons (Engineering Tools)
-
-| Weapon | Description | Best Used For |
-|--------|-------------|---------------|
-| **Plasma Cutter** | Precision single-shot laser beam | Limb targeting |
-| **Ripper** | Launches a spinning saw blade | Crowd control, multi-limb hits |
-
-Ammo drops are scarce and shared between players. Teamwork required.
-
-### 3.3 Enemy AI (Necromorphs)
-- Roam the ship on patrol paths when not aggroed
-- Aggro triggers: line of sight OR proximity sound
-- Pathfind to players using Roblox `PathfindingService`
-- Behaviors change based on missing limbs:
-  - No legs → crawls, slower but still bites
-  - No arms → charges and headbutts
-  - Full limbs → standard attack + lunge
-
-### 3.4 Co-op System
-- 2–4 players share the same map
-- Downed players bleed out over 30 seconds — teammates can revive (hold E near body)
-- If all players die → game over, return to checkpoint
-- Shared ammo/health crate pool placed around the map
-
-### 3.5 Atmosphere
-- Near-total darkness — players have a small personal light radius
-- Flickering lights built with `TweenService` on `PointLight` instances
-- Spatial audio — enemy groans audible through walls, louder as they approach
-- Minimal HUD — health shown on character suit glow (not a health bar)
-- Scripted jumpscare moments at key locations
+**Implementation:** Each limb is a separate `Part` welded to the Torso. HP stored as Attributes. Server-side only.
 
 ---
 
-## 4. World / Map
+## Weapons
 
-**Setting:** The USG Ishimura — a colossal deep-space mining vessel, completely dark
+| Weapon | Damage/Limb | Damage/Body | Ammo | Cooldown | Best For |
+|--------|-------------|-------------|------|----------|----------|
+| Plasma Cutter | 18 | 5 | 12 | 0.4s | Precision limb shots |
+| Ripper | 30 | 8 | 6 | 1.2s | Crowd control, multi-limb |
 
-**Key Locations (v1 scope):**
-1. Airlock Entry / Crash Site — tutorial section
-2. Engineering Deck — industrial corridors, first Necromorphs
-3. Medical Bay — scattered bodies, resource caches
-4. Reactor Core — final area, boss encounter
-
-**Visual Style:** Industrial sci-fi, grimy metal, emergency red lighting, flickering terminals
+Ammo is scarce and shared between players. Cooperation required.
 
 ---
 
-## 5. Progression System
+## Enemy Types
 
-- No leveling — tension comes from scarcity, not stats
-- Suit upgrades found in the environment (passive: more health, bigger light radius)
-- Weapon upgrades: pick up schematic items that unlock attachments
+**Standard Necromorph**
+- Walk speed: 16 studs/s (6 when legless)
+- Aggro range: 40 studs
+- Attack damage: 15 HP per hit, 1.5s cooldown
+- Behavior: Patrol → Aggro → Attack. Reacts to missing limbs.
 
----
-
-## 6. Monetization Ideas
-
-- [ ] **Game Pass: Survivor Pack** — extra starting ammo + flashlight skin
-- [ ] **Developer Product: Revive Token** — instant team revive (not pay-to-win, just convenience)
-- [ ] **VIP Server** — private session for friend groups
-
----
-
-## 7. Art Style
-
-- **Style:** Realistic-lean, dark sci-fi (as detailed as Roblox allows)
-- **Color Palette:** Black, dark grey, emergency red, pale blue glow
-- **Reference:** Dead Space (2008), Alien: Isolation
-- **Enemy Design:** Mutated humanoids, limbs visible as separate model parts
+**Crawler** (legless from spawn)
+- Crawl speed: 14 studs/s (fast on the ground — more dangerous than it looks)
+- Aggro range: 25 studs
+- Attack damage: 20 HP per hit, 1.0s cooldown
+- Behavior: Hides under objects, activates when player is close
 
 ---
 
-## 8. Audio
+## Co-op System
 
-- **Music:** Ambient industrial drone, no traditional BGM — silence is a tool
-- **Key Sound Effects:**
-  - Plasma Cutter beam + impact
-  - Necromorph groan (distance-attenuated)
-  - Limb-sever crunch
-  - Heartbeat when low health
-  - Teammate revive prompt chime
+- **Downed state:** HP reaches 0 → can't move, 30s bleedout timer begins
+- **Revive:** Living player holds E within 6 studs for 3 seconds → revived at 50 HP
+- **Game over:** All players downed simultaneously
+- **Checkpoints:** Saved to DataStore on reach. Team respawns here on game over.
+
+---
+
+## Map — 4 Zones
+
+| Zone | Enemies | Key Feature |
+|------|---------|-------------|
+| Airlock Entry | None | Tutorial, atmosphere intro |
+| Engineering Deck | 2 Standard + 1 Crawler | First combat, tight corridors |
+| Medical Bay | 3 Crawlers + 1 Standard | Jumpscare, wider rooms |
+| Reactor Core | Boss wave (3+2) | Final escape sequence |
+
+---
+
+## Technical Architecture
+
+```
+ServerScriptService/ISHIMURA/
+  Modules/
+    WeaponConfig         ← damage, ammo, cooldowns
+    DismembermentModule  ← limb HP tables, sever logic
+    EnemyConfig          ← speed, aggro, attack values
+  WeaponHandler          ← server: validates hits, routes damage
+  NecromorphAI           ← per-enemy state machine
+  PlayerDamageHandler    ← server: applies damage to players
+  ReviveSystem           ← downed/revive/bleedout
+  GameManager            ← win/loss, checkpoints
+  DataStoreManager       ← checkpoint persistence
+
+ReplicatedStorage/Remotes/
+  FireWeapon, LimbDestroyed, PlayerDowned,
+  RevivePlayer, UpdateSuitGlow
+
+StarterPlayerScripts/
+  WeaponController       ← raycast on click, fires FireWeapon
+  SuitGlowController     ← HP → suit color feedback
+  RevivePrompt           ← proximity E-hold UI
+  AtmosphereController   ← flickering lights, personal flashlight
+```
+
+**Rule:** All state changes (damage, death, revive, pickups) run server-side. Clients handle input and visual feedback only.
+
+---
+
+## Art Direction
+
+- **Style:** Dark industrial sci-fi — grimy metal, exposed pipes, emergency lighting
+- **Palette:** Black, dark grey, emergency red accents, pale blue suit/terminal glow
+- **Lighting:** Near-total darkness. Players have a narrow personal flashlight (30° beam). Flickering PointLights on walls.
+- **HUD:** Minimal — no health bar. Suit color = health. Ammo number bottom-right. Team helmets top-left.
+
+---
+
+## Audio
+
+| Sound | Trigger |
+|-------|---------|
+| Industrial ambient drone | Always looping |
+| Heartbeat | HP < 30%, pitch rises with damage |
+| Necromorph groan | Enemy within 50 studs (3D spatial) |
+| Limb sever crunch | Limb HP → 0 |
+| Plasma Cutter fire | Weapon fired |
+| Revive chime | Revive complete |
+| Jumpscare sting | Scripted trigger zones |
