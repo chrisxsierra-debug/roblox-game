@@ -1,63 +1,76 @@
 # Roadmap
 
-Track development phases and milestones here. Check off items as they're completed.
+Development phases for **ISHIMURA** — Co-op Dead Space Horror on Roblox.
 
 ---
 
 ## Phase 0 — Planning (Current)
 
-- [x] Create GitHub repo
-- [ ] Finalize game concept and genre
-- [ ] Complete Game Design Document
-- [ ] Assign team roles
-- [ ] Set up Roblox Studio project
+- [x] Create GitHub repo with docs
+- [x] Choose game concept (co-op sci-fi survival horror)
+- [ ] Finalize map layout sketch (corridors, rooms, key locations)
+- [ ] Choose final working title
+- [ ] Set up Roblox Studio project + folder structure
 
 ---
 
-## Phase 1 — Prototype
+## Phase 1 — Prototype (Target: 2–3 weeks)
 
-> Goal: A playable proof-of-concept with the core mechanic working.
+> Goal: One playable corridor section with the core dismemberment loop working.
 
-- [ ] _TODO: Add prototype tasks here_
-- [ ] _TODO: e.g., Build basic map_
-- [ ] _TODO: e.g., Implement core mechanic_
-- [ ] Internal playtest
+- [ ] Build one corridor + one room of the ship interior
+- [ ] Script basic Necromorph AI (patrol → aggro → attack)
+- [ ] Implement dismemberment hit system on one enemy type
+- [ ] One working weapon (Plasma Cutter)
+- [ ] Basic lighting atmosphere (flickering, dark)
+- [ ] Internal playtest — does dismemberment feel good?
 
 ---
 
-## Phase 2 — Alpha
+## Phase 2 — Alpha (Target: 4–6 weeks from prototype)
 
-> Goal: Full feature set in a rough state. Internal testing only.
+> Goal: Full feature set rough. Team can play through start to finish.
 
-- [ ] _TODO: Add alpha tasks here_
-- [ ] _TODO: e.g., Add progression system_
-- [ ] _TODO: e.g., Basic UI/UX_
-- [ ] Alpha playtest with team
+- [ ] Full ship map (Airlock → Engineering → Medical Bay → Reactor)
+- [ ] 2 Necromorph variants with different behaviors
+- [ ] 2 weapons (Plasma Cutter + Ripper)
+- [ ] Co-op revive system
+- [ ] Ammo/health pickups scattered around map
+- [ ] Checkpoint system
+- [ ] Scripted jumpscare moments
+- [ ] Alpha playtest with 2–4 friends
 
 ---
 
 ## Phase 3 — Beta
 
-> Goal: Polished enough for external testers. Bug fixing and balancing.
+> Goal: Polished enough for outside testers. Content creator ready.
 
-- [ ] _TODO: Add beta tasks here_
-- [ ] _TODO: e.g., Sound design_
-- [ ] _TODO: e.g., Performance optimization_
-- [ ] External beta test
+- [ ] Sound design (enemy audio, weapon sounds, heartbeat)
+- [ ] Suit glow health system (replace placeholder health bar)
+- [ ] Reactor boss encounter
+- [ ] Performance optimization (no lag in co-op)
+- [ ] Thumbnail + game icon designed
+- [ ] Game Pass and monetization added
+- [ ] External beta test — share with Roblox horror community
 
 ---
 
 ## Phase 4 — Launch
 
-- [ ] Final bug fixes
+- [ ] Final bug fixes from beta feedback
 - [ ] Publish to Roblox
-- [ ] Marketing / social posts
-- [ ] Monitor feedback and patch
+- [ ] Share with horror YouTubers / TikTokers for coverage
+- [ ] Monitor player feedback and patch weekly
 
 ---
 
 ## Ideas Backlog
 
-> Features or ideas that don't fit the current phases yet.
+> Features that don't fit current scope but worth revisiting post-launch.
 
-- _TODO: Add ideas here_
+- Zero-gravity sections (airlocks, space exterior)
+- Intensity Director (dynamic scare system based on player stress)
+- Additional Necromorph types
+- New maps / DLC areas
+- Cosmetic suit skins
