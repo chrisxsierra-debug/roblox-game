@@ -30,4 +30,36 @@ function RemoteValidator.validateSlotIndex(slotIndex: any, maxSlots: number): bo
 	return RemoteValidator.isIntInRange(slotIndex, 1, maxSlots)
 end
 
+-- True if `v` is a finite number within [min, max] (allows fractions, e.g. volumes).
+function RemoteValidator.isNumberInRange(v: any, min: number, max: number): boolean
+	return type(v) == "number" and v == v and v >= min and v <= max
+end
+
+-- Validate an UpdateSettings payload shape (contract §3): a table with
+-- MusicVolume/SoundVolume in [0, 1] and a boolean ReducedEffects. Returns the
+-- sanitized settings on success, or nil if the shape is invalid.
+function RemoteValidator.validateSettings(settings: any): {
+	MusicVolume: number,
+	SoundVolume: number,
+	ReducedEffects: boolean,
+}?
+	if type(settings) ~= "table" then
+		return nil
+	end
+	if not RemoteValidator.isNumberInRange(settings.MusicVolume, 0, 1) then
+		return nil
+	end
+	if not RemoteValidator.isNumberInRange(settings.SoundVolume, 0, 1) then
+		return nil
+	end
+	if type(settings.ReducedEffects) ~= "boolean" then
+		return nil
+	end
+	return {
+		MusicVolume = settings.MusicVolume,
+		SoundVolume = settings.SoundVolume,
+		ReducedEffects = settings.ReducedEffects,
+	}
+end
+
 return RemoteValidator

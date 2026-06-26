@@ -11,9 +11,35 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameConfig = require(Shared:WaitForChild("Config"):WaitForChild("GameConfig"))
+local EconomyConfig = require(Shared:WaitForChild("Config"):WaitForChild("EconomyConfig"))
+local MonetizationConfig = require(Shared:WaitForChild("Config"):WaitForChild("MonetizationConfig"))
 
 local GrowthService = {}
 GrowthService.Name = "GrowthService"
+
+-- Compute the combined growth-speed multiplier applied at PLANT time (§18):
+--   tutorial accelerator (if the tutorial crop is active) × 2x pass (if owned).
+-- The 2x pass affects only FUTURE crops, which is why the multiplier is stored in
+-- the slot at plant time (callers persist GrowthService → slot.GrowthSpeedMultiplier).
+function GrowthService.computeSpeedMultiplier(hasDoubleGrowth: boolean): number
+	local mult = 1
+	if hasDoubleGrowth then
+		mult *= MonetizationConfig.GamePasses.DoubleGrowth.GrowthMultiplier
+	end
+	return mult
+end
+
+-- Absolute ReadyAt for a crop planted at `plantedAt`, given the seed's base grow
+-- duration and the (already-combined) speed multiplier. Uses EconomyConfig so all
+-- the math stays in the single source of truth.
+function GrowthService.computeReadyAt(
+	plantedAt: number,
+	baseDuration: number,
+	speedMultiplier: number
+): number
+	local duration = EconomyConfig.getGrowthDuration(baseDuration, speedMultiplier)
+	return plantedAt + math.floor(duration + 0.5)
+end
 
 -- Cosmetic stage index for a crop, based on absolute time (§9).
 -- 0 = Egg ... (GrowthStageCount-1) = Full.

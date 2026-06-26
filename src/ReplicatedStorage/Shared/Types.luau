@@ -57,8 +57,16 @@ export type PlayerData = {
 	LastSeenAt: number,
 }
 
--- A sanitized snapshot the server sends to the client (§16). Never includes
--- internal/security fields.
+export type PassOwnership = {
+	DoubleGrowth: boolean,
+	AutoCollect: boolean,
+	GoldenPlotVIP: boolean,
+}
+
+-- A sanitized snapshot the server sends to the client on DataUpdated (§16). Never
+-- includes internal/security fields. The server computes the derived fields
+-- (IncomeMultiplier, NextSlotCost, RebirthRequirement, Passes) so the client never
+-- has to — the client renders this verbatim.
 export type DataSnapshot = {
 	Coins: number,
 	LifetimeCoins: number,
@@ -69,6 +77,22 @@ export type DataSnapshot = {
 	Slots: { FarmSlot },
 	Tutorial: TutorialState,
 	FertilizerCharges: number,
+
+	-- derived/display fields (server-computed)
+	PlotId: number?,
+	NextSlotCost: number?, -- cost of the next buyable slot, or nil if maxed
+	RebirthRequirement: number, -- coins needed for the next rebirth
+	Passes: PassOwnership,
+}
+
+-- Payload for the PlayEffect server->client event (§28). `Kind` is one of
+-- Constants.Effects. The client's EffectsController switches on Kind.
+export type EffectPayload = {
+	Kind: string,
+	SlotIndex: number?,
+	CreatureId: string?,
+	MutationId: string?,
+	Amount: number?, -- e.g. coins granted on Harvest
 }
 
 return {}

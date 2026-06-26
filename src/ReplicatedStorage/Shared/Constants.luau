@@ -54,16 +54,34 @@ Constants.ServerToClientEvents = {
 	"PurchaseResult",
 }
 
--- Attribute / collection-tag keys used on plot instances (§11).
+-- Attribute / collection-tag keys used on plot instances (§11). The WORLD writes
+-- these onto plot/slot parts; the CLIENT reads them to locate its slots in 3D.
 Constants.Attributes = {
 	PlotId = "PlotId",
 	OwnerUserId = "OwnerUserId",
 	SlotIndex = "SlotIndex",
+	Locked = "Locked", -- true on a slot marker that isn't unlocked yet
 }
 
 Constants.Tags = {
 	Plot = "BrainrotPlot",
 	GrowSlot = "BrainrotGrowSlot",
+}
+
+-- Workspace folder names (§22). World generation lives under these; idempotent.
+Constants.World = {
+	GeneratedFolder = "GeneratedWorld",
+	PlotsFolder = "Plots",
+	AuthoredMapFolder = "Map", -- if present, skip placeholder generation
+}
+
+-- PlayEffect kinds (§28). Server sends Constants.Effects.X as EffectPayload.Kind.
+Constants.Effects = {
+	Plant = "Plant",
+	StageChange = "StageChange",
+	Ready = "Ready",
+	Harvest = "Harvest",
+	Mutation = "Mutation",
 }
 
 -- Rate-limit windows (requests per second) per remote (§17).
