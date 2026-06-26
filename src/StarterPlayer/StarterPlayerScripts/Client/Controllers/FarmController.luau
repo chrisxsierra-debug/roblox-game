@@ -382,6 +382,14 @@ function FarmController.Start()
 		Remotes.Events[Constants.Remotes.FarmAssigned].OnClientEvent:Connect(onFarmAssigned)
 	)
 
+	-- Fallback: if FarmAssigned fired before we connected, recover the plot id from
+	-- the snapshot (it carries PlotId). Fires immediately if a snapshot already exists.
+	UIController.onSnapshot(function(snapshot: DataSnapshot)
+		if not assignedPlotId and snapshot.PlotId then
+			onFarmAssigned(snapshot.PlotId)
+		end
+	end)
+
 	bindInputs()
 
 	-- Drive cosmetic billboards/stage detection from a throttled render loop.

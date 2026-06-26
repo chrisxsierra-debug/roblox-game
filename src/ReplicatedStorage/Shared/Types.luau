@@ -83,6 +83,7 @@ export type DataSnapshot = {
 	NextSlotCost: number?, -- cost of the next buyable slot, or nil if maxed
 	RebirthRequirement: number, -- coins needed for the next rebirth
 	Passes: PassOwnership,
+	ReducedEffects: boolean, -- mirror of Settings.ReducedEffects for the client
 }
 
 -- Payload for the PlayEffect server->client event (§28). `Kind` is one of

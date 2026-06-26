@@ -1,5 +1,36 @@
 # Development Log
 
+## 2026-06-26 — Vertical slice + ProfileStore + adversarial review
+
+**Build.** Implemented the playable vertical slice across server/world/client via a multi-agent
+workflow (3 parallel track agents → integrate-to-green → review). The integrate pass found+fixed two
+real contract gaps (a dead `UpdateSettings` handler and an unhandled `RequestData` RemoteFunction).
+Checkpoint commit `c8d9b1b`.
+
+**Data backend → ProfileStore.** Per the "copy how the top games do the backend" research, swapped the
+hand-rolled DataStore layer for **ProfileStore** (loleris/MadStudio, Apache-2.0, vendored at
+`Server/Vendor/ProfileStore.luau`) — session-locking is what prevents the server-hop/fast-rejoin data
+loss that kills "currency goes up" games (loleris has stated Grow a Garden uses it). Kept
+`PlayerDataService`'s public API identical, so nothing else changed. Added leaderstats mirroring. The
+vendored lib is excluded from selene/stylua.
+
+**Review.** The workflow's own review phase failed (two reviewers returned placeholder output, one
+errored on the schema), so I re-ran a real 3-lens adversarial review (security / economy-logic /
+integration+ProfileStore). Verdict: core is sound — no exploitable economy/ownership/double-grant/
+early-harvest holes, ProfileStore integration correct, no require cycles. Fixed the real findings:
+- Tutorial crop now pays the flat `TutorialReward` (20) and pins a fixed Common (was rolling 10–12).
+- **Creature models now advance through their 4 stages** via a single central `GrowthService` sweep
+  (§29-friendly) that also fires the `Ready` effect — previously the model was stuck at the egg.
+- `RateLimiter:clear` is delimiter-aware (no longer wipes userId "120" when clearing "12").
+- `DataSnapshot.PlotId` + `ReducedEffects` are now populated (fixes multi-player effect targeting and
+  the reduced-effects setting); plot id flows via a transient cache (no require cycle).
+- Client pulls an initial snapshot via `RequestData` and recovers its plot from `snapshot.PlotId`
+  (fixes a first-frame race where the HUD/plot could be dropped).
+- Offline-cap constant is now enforced as the max grow duration.
+
+Remaining known gaps (gated, not active) tracked in `TODO.md` — chiefly: fertilizer charges aren't
+consumed yet. All four static gates green throughout.
+
 ## 2026-06-26 — Foundation + 3-team scaffold
 
 **Context.** Repo cleared of the previous ISHIMURA concept and re-scoped to *Brainrot Farm: Grow &

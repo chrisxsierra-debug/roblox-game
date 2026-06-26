@@ -47,10 +47,13 @@ function RateLimiter.allow(self: RateLimiter, key: string, maxPerSecond: number)
 	return true
 end
 
--- Forget a key (e.g. when a player leaves).
+-- Forget a key, or every key under a "<prefix>:" namespace (e.g. on player leave,
+-- pass the userId to drop all "<userId>:<Action>" windows). Delimiter-aware so
+-- clearing userId "12" does NOT also wipe "120", "123", … (their keys start "120:").
 function RateLimiter.clear(self: RateLimiter, keyPrefix: string)
+	local namespaced = keyPrefix .. ":"
 	for key in self._hits do
-		if string.sub(key, 1, #keyPrefix) == keyPrefix then
+		if key == keyPrefix or string.sub(key, 1, #namespaced) == namespaced then
 			self._hits[key] = nil
 		end
 	end

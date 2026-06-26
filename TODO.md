@@ -1,36 +1,36 @@
 # TODO
 
-Foundation is done. Remaining work is split in [`TASK_SPLIT.md`](TASK_SPLIT.md). High-level checklist:
+The playable vertical slice is **implemented** (server/world/client) and the data layer uses
+**ProfileStore** session-locking. Static gates are green (selene/stylua/lune/rojo). Nothing has been
+runtime-tested in Studio yet — that's the top remaining item. See [`TASK_SPLIT.md`](TASK_SPLIT.md) for
+ownership and [`QA_CHECKLIST.md`](QA_CHECKLIST.md) for the Studio test pass.
 
-## Track A — Server & Data
-- [ ] `PlayerDataService`: load/save, backoff, **failed-load guard**, reconcile, migrate v0→v1,
-      sanitize, autosave + PlayerRemoving + BindToClose, receipt pruning.
-- [ ] `EconomyService`: add/spend coins, LifetimeCoins, BuySlot, unlock re-checks.
-- [ ] `GrowthService`: ReadyAt at plant time + combined speed multiplier.
-- [ ] `FarmService`: PlantSeed/HarvestSlot handlers + full §17 validation + rolls + payout.
-- [ ] `RebirthService`: requirement, confirmation token, reset/preserve.
-- [ ] `TutorialService`: step gating, guaranteed Common, persisted.
-- [ ] `AutoCollectService`: single central interval loop.
-- [ ] `MonetizationService`: pass cache + idempotent ProcessReceipt + pending-purchase context.
-- [ ] `AdminService`: Studio-only guarded commands.
-- [ ] `DataValidator.sanitizeProfile`.
+## Top priority — Studio (Mode A)
+- [ ] Open Studio with the Rojo/robloxstudio plugin, sync, and run `QA_CHECKLIST.md` end to end.
+      Enable Studio API access so ProfileStore uses the real DataStore (else it runs in mock mode).
+- [ ] Tune the three headline balance values first: tutorial grow duration, starting slot count,
+      Tier-1 profit/grow time.
 
-## Track B — Client
-- [ ] `UIController`: ScreenGui + wire UI modules + route snapshots.
-- [ ] `FarmController`: slot input → intents; keyboard + gamepad; cosmetic stage animation.
-- [ ] `TutorialController`, `EffectsController`.
-- [ ] UI modules: `HUD`, `SlotPanel`, `SeedPicker`, `ShopPanel`, `RebirthPanel`, `NotificationPanel`.
+## Known gaps from the adversarial review (do before a monetized launch)
+- [ ] **Fertilizer is not consumable.** `RequestFertilizerPurchase` grants `FertilizerCharges`, but no
+      flow ever spends a charge / reduces a crop's remaining time. It's harmless today because the
+      product Id defaults to 0 (the button is hidden), but **do not configure the FertilizerPack Id**
+      until a "use fertilizer on a slot" path exists (new remote + handler + UI), or repurpose the
+      product to apply the reduction directly on purchase like Instant Grow.
+- [ ] **Instant-Grow fallback** currently grants a Fertilizer pack if the targeted slot vanished between
+      prompt and receipt (and fertilizer does nothing yet). Improve to complete the player's first
+      growing crop instead, or refund-equivalent with a clear `Notification`. (Also gated by Id 0.)
+- [ ] **Settings UI.** The server `UpdateSettings` handler + `ReducedEffects` snapshot field exist and
+      are wired, but there's no client settings panel that fires `UpdateSettings`. Build one (Track B).
+- [ ] `MonetizationService` fires one `SlotUpdated` with the live slot table instead of a deep copy —
+      route it through the same helper as `FarmService` for convention (cosmetic; Roblox serializes on
+      send so there's no aliasing bug).
 
-## Track C — World, Creatures & QA
-- [ ] `CreatureModelFactory`: 9 creatures × 4 stages × mutation visuals from Parts.
-- [ ] `PlotFactory` + `WorldService`: 8 plots, world gen, authored-map detection, idempotent.
-- [ ] Populate `AssetConfig` sound ids; author juice.
-- [ ] Execute `QA_CHECKLIST.md` in Studio; record results.
-
-## Shared / glue (small PRs, all rebase)
+## Polish / V1.1
+- [ ] Server-emit `StageChange` juice too (currently client-driven locally; the model staging itself is
+      now server-driven via the GrowthService sweep).
+- [ ] Fill `MonetizationConfig` + `AssetConfig` ids from the Creator Dashboard (all default 0).
 - [ ] Add admin UserIds to `AdminConfig`.
-- [ ] Fill `MonetizationConfig` ids from the Creator Dashboard.
-- [ ] Confirm pinned tool versions in `rokit.toml` resolve for everyone.
 
 ## V2 (do NOT build yet — §4)
 Raiding, stealing, shields, trading, leaderboards, collection-book UI, friend fertilization, clans,

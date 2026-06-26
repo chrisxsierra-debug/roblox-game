@@ -80,6 +80,9 @@ function PlotService.assign(player: Player)
 
 	assignments[userId] = plotId
 	plotOwners[plotId] = userId
+	-- Stamp the plot id into the transient cache so DataSnapshot.PlotId is populated
+	-- (the client scopes 3D slot/effect lookups by it). Mirrors the passes pattern.
+	PlayerDataService.setPlotId(userId, plotId)
 
 	-- Track C builds the 3D plot (PlotService decides WHO, WorldService builds visuals).
 	local ok, err = pcall(function()

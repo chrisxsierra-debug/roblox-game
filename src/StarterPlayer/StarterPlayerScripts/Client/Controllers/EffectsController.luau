@@ -270,6 +270,12 @@ end
 
 function EffectsController.Start()
 	Remotes.Events[Constants.Remotes.PlayEffect].OnClientEvent:Connect(onPlayEffect)
+
+	-- The accessibility "reduced effects" setting now rides on the snapshot; keep our
+	-- local flag in sync so heavy particle/tween effects are skipped when it's on.
+	UIController.onSnapshot(function(snapshot)
+		reducedEffects = snapshot.ReducedEffects == true
+	end)
 end
 
 return EffectsController

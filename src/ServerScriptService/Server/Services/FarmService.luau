@@ -183,8 +183,8 @@ function FarmService.plant(player: Player, slotIndex: number, seedTier: number):
 		end
 	end
 
-	-- Roll the creature (weighted within tier). Guaranteed tutorial uses the
-	-- highest-weight Common so the reveal is deterministic-ish but still original.
+	-- Roll the creature (weighted within tier). The guaranteed tutorial crop is PINNED
+	-- to a fixed Common (candidates[1]) so the first reveal is consistent for everyone.
 	local candidates = CreatureDefinitions.getByTier(effectiveTier)
 	if #candidates == 0 then
 		-- Refund and abort if a tier somehow has no creatures.
@@ -193,9 +193,11 @@ function FarmService.plant(player: Player, slotIndex: number, seedTier: number):
 		end
 		return false, "no_creatures"
 	end
-	local creature = WeightedRandom.choose(candidates, function(c)
-		return c.BaseWeight
-	end)
+	local creature = if isGuaranteed
+		then candidates[1]
+		else (WeightedRandom.choose(candidates, function(c)
+			return c.BaseWeight
+		end))
 
 	-- Roll the mutation (no mutation luck on the tutorial crop → forced Normal).
 	local mutationId = "Normal"
@@ -288,13 +290,20 @@ function FarmService.harvestInternal(player: Player, slotIndex: number): (boolea
 	end
 
 	local ownership = PlayerDataService.getPasses(userId)
-	local payout = EconomyConfig.computePayout(
-		tierDef.BaseSellValue,
-		creatureDef.BaseValueMultiplier,
-		mutationDef.ValueMultiplier,
-		data.Rebirths,
-		ownership.GoldenPlotVIP
-	)
+	-- The guaranteed tutorial crop pays a fixed reward (§6), not a rolled payout. Check
+	-- BEFORE notifyHarvested advances the step out of PlantedTutorialCrop.
+	local payout: number
+	if TutorialService.isGuaranteedHarvestStep(userId) then
+		payout = EconomyConfig.TutorialReward
+	else
+		payout = EconomyConfig.computePayout(
+			tierDef.BaseSellValue,
+			creatureDef.BaseValueMultiplier,
+			mutationDef.ValueMultiplier,
+			data.Rebirths,
+			ownership.GoldenPlotVIP
+		)
+	end
 
 	-- Apply economy (earn → bumps LifetimeCoins + re-checks unlocks).
 	EconomyService.addCoins(userId, payout, true)

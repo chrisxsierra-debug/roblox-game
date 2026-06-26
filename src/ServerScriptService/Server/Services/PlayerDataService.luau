@@ -1,22 +1,20 @@
 --!strict
--- PlayerDataService — DataStore load/save + session cache (§13, §14).
--- TRACK A owns this. Sole owner of the in-memory session cache: every other
--- server service reads/mutates through it and nothing else opens a DataStore.
+-- PlayerDataService — persistent player data via ProfileStore session-locking (§13, §14).
+-- TRACK A owns this. Sole owner of the in-memory session cache: every other server
+-- service reads/mutates through it and nothing else opens a DataStore.
 --
--- Non-negotiable safety rules (§14):
---   * UpdateAsync + pcall + exponential backoff, MaxDataStoreRetries.
---   * Failed-load guard: if load fails after all retries, mark the session
---     load-failed, show a friendly error, BLOCK gameplay, kick safely, and
---     NEVER save over it.
---   * Default-profile reconciliation (TableUtility.reconcile).
---   * Schema migration (example v0 -> v1).
---   * Autosave every GameConfig.AutosaveIntervalSeconds, on PlayerRemoving,
---     and on BindToClose. Save after rebirth.
---   * Sanitize/clamp malformed numbers; repair duplicate slots; prune receipts.
+-- Backend: ProfileStore (MadStudio / loleris) — the de-facto standard used by top
+-- idle/sim games (incl. Grow a Garden). Vendored at Server/Vendor/ProfileStore.luau
+-- (Apache-2.0). Session-locking gives us, for free, the safety the spec demands (§14):
+--   * Atomic per-key lock → two servers can never load/save the same profile at once
+--     (no server-hop / fast-rejoin data loss or duplication).
+--   * Periodic auto-save + save-on-EndSession + auto BindToClose handling.
+--   * :Reconcile() fills missing template fields (schema growth).
+-- On top of ProfileStore we keep our own concerns: an explicit FAILED-LOAD GUARD
+-- (StartSession returns nil → block gameplay, notify, kick, never save), a v0→v1
+-- migration, DataValidator sanitization, leaderstats mirroring, and a 60s save cadence.
 
 local Players = game:GetService("Players")
-local DataStoreService = game:GetService("DataStoreService")
-local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -33,43 +31,31 @@ local Utility = Server:WaitForChild("Utility")
 local DataValidator = require(Utility:WaitForChild("DataValidator"))
 local RemoteValidator = require(Utility:WaitForChild("RemoteValidator"))
 local RateLimiterModule = require(Utility:WaitForChild("RateLimiter"))
+local ProfileStore = require(Server:WaitForChild("Vendor"):WaitForChild("ProfileStore"))
 
 local limiter = RateLimiterModule.new()
 
 local PlayerDataService = {}
 PlayerDataService.Name = "PlayerDataService"
 
--- userId -> PlayerData (only present once successfully loaded)
+-- A loaded ProfileStore profile (kept untyped — ProfileStore is third-party).
+type Profile = any
+
+-- userId -> PlayerData (== profile.Data; present only once successfully loaded)
 local sessions: { [number]: Types.PlayerData } = {}
--- userId -> true while a load is in flight or has permanently failed (blocks gameplay)
+-- userId -> active Profile object
+local profiles: { [number]: Profile } = {}
+-- userId -> true while a load has permanently failed (blocks gameplay)
 local loadFailed: { [number]: boolean } = {}
 -- userId -> true while a load is still in progress (waitForData yields on this)
 local loading: { [number]: boolean } = {}
--- userId -> true when this session needs an autosave
+-- userId -> true when this session has unsaved changes (cleared by the 60s save loop)
 local dirty: { [number]: boolean } = {}
 -- userId -> transient pass-ownership cache, set by MonetizationService.setPasses.
 -- Kept OUT of saved data so PlayerDataService never has to require MonetizationService.
 local passes: { [number]: Types.PassOwnership } = {}
-
-local store: DataStore? = nil
-
-local function getStore(): DataStore?
-	if store then
-		return store
-	end
-	local ok, result = pcall(function()
-		return DataStoreService:GetDataStore(
-			GameConfig.getDataStoreName(),
-			GameConfig.DataStoreScope
-		)
-	end)
-	if ok then
-		store = result
-		return store
-	end
-	warn(`[PlayerDataService] could not open DataStore: {result}`)
-	return nil
-end
+-- userId -> assigned plot id, set by PlotService (same trick to dodge a require cycle).
+local plotIds: { [number]: number } = {}
 
 local function keyFor(userId: number): string
 	return `player_{userId}`
@@ -79,7 +65,7 @@ local function defaultPasses(): Types.PassOwnership
 	return { DoubleGrowth = false, AutoCollect = false, GoldenPlotVIP = false }
 end
 
--- ── Default profile ───────────────────────────────────────────────────────
+-- ── Default profile (also the ProfileStore template) ────────────────────────
 function PlayerDataService.getDefaultProfile(): Types.PlayerData
 	return {
 		DataVersion = GameConfig.DataVersion,
@@ -103,6 +89,11 @@ function PlayerDataService.getDefaultProfile(): Types.PlayerData
 		LastSeenAt = 0,
 	}
 end
+
+-- One ProfileStore for the whole experience (dev/prod name from GameConfig). In
+-- Studio without API access, ProfileStore transparently uses an in-memory mock.
+local profileStore =
+	ProfileStore.New(GameConfig.getDataStoreName(), PlayerDataService.getDefaultProfile())
 
 -- ── Session accessors ──────────────────────────────────────────────────────
 function PlayerDataService.get(userId: number): Types.PlayerData?
@@ -148,8 +139,13 @@ function PlayerDataService.getPasses(userId: number): Types.PassOwnership
 	return passes[userId] or defaultPasses()
 end
 
+-- Transient plot-id cache, pushed by PlotService on assignment (avoids a require
+-- cycle; lets buildSnapshot populate DataSnapshot.PlotId for client slot scoping).
+function PlayerDataService.setPlotId(userId: number, plotId: number?)
+	plotIds[userId] = plotId
+end
+
 -- Apply a validated settings table to the live profile (contract §3 UpdateSettings).
--- The values are already shape/range-checked by RemoteValidator.validateSettings.
 function PlayerDataService.applySettings(userId: number, settings: Types.Settings)
 	local data = PlayerDataService.get(userId)
 	if not data then
@@ -163,7 +159,8 @@ end
 
 -- ── Migration ──────────────────────────────────────────────────────────────
 -- Example v0 -> v1: very old saves stored a flat `coins` field and no DataVersion.
--- Map them forward, then let reconcile fill the rest of the v1 shape.
+-- Mutates `data` IN PLACE (ProfileStore requires the same table reference) then
+-- relies on :Reconcile() to fill the rest of the v1 shape.
 function PlayerDataService.migrate(data: any): Types.PlayerData
 	if type(data) ~= "table" then
 		return PlayerDataService.getDefaultProfile()
@@ -175,7 +172,7 @@ function PlayerDataService.migrate(data: any): Types.PlayerData
 	end
 
 	if version < 1 then
-		-- v0 -> v1 example migration.
+		-- v0 -> v1 example migration (runs BEFORE reconcile so old fields win).
 		if data.coins ~= nil and data.Coins == nil then
 			data.Coins = data.coins
 			data.coins = nil
@@ -189,6 +186,45 @@ function PlayerDataService.migrate(data: any): Types.PlayerData
 	-- Future migrations chain here (v1 -> v2, ...).
 
 	return data
+end
+
+-- ── Leaderstats mirroring (standard pattern) ────────────────────────────────
+local function setupLeaderstats(player: Player)
+	if player:FindFirstChild("leaderstats") then
+		return
+	end
+	local ls = Instance.new("Folder")
+	ls.Name = "leaderstats"
+
+	local coins = Instance.new("IntValue")
+	coins.Name = "Coins"
+	coins.Parent = ls
+
+	local rebirths = Instance.new("IntValue")
+	rebirths.Name = "Rebirths"
+	rebirths.Parent = ls
+
+	ls.Parent = player
+end
+
+local function updateLeaderstats(player: Player)
+	local data = sessions[player.UserId]
+	if not data then
+		return
+	end
+	local ls = player:FindFirstChild("leaderstats")
+	if not ls then
+		return
+	end
+	local coins = ls:FindFirstChild("Coins") :: IntValue?
+	if coins then
+		-- IntValue caps at 2^31; clamp so very large balances don't overflow.
+		coins.Value = math.clamp(math.floor(data.Coins), 0, 2 ^ 31 - 1)
+	end
+	local rebirths = ls:FindFirstChild("Rebirths") :: IntValue?
+	if rebirths then
+		rebirths.Value = math.clamp(data.Rebirths, 0, 2 ^ 31 - 1)
+	end
 end
 
 -- ── Snapshot (server-computed derived fields, §16) ──────────────────────────
@@ -217,7 +253,7 @@ function PlayerDataService.buildSnapshot(userId: number): Types.DataSnapshot?
 		Tutorial = { Completed = data.Tutorial.Completed, Step = data.Tutorial.Step },
 		FertilizerCharges = data.FertilizerCharges,
 
-		PlotId = nil, -- PlotService stamps this onto FarmAssigned; snapshot leaves nil.
+		PlotId = plotIds[userId], -- populated by PlotService.setPlotId on assignment
 		NextSlotCost = nextSlotCost,
 		RebirthRequirement = EconomyConfig.getRebirthRequirement(data.Rebirths),
 		Passes = {
@@ -225,11 +261,13 @@ function PlayerDataService.buildSnapshot(userId: number): Types.DataSnapshot?
 			AutoCollect = ownership.AutoCollect,
 			GoldenPlotVIP = ownership.GoldenPlotVIP,
 		},
+		ReducedEffects = data.Settings.ReducedEffects == true,
 	}
 end
 
--- Fire the full sanitized snapshot to a single player (§16).
+-- Fire the full sanitized snapshot to a single player (§16) + keep leaderstats synced.
 function PlayerDataService.replicate(player: Player)
+	updateLeaderstats(player)
 	local snapshot = PlayerDataService.buildSnapshot(player.UserId)
 	if not snapshot then
 		return
@@ -237,92 +275,22 @@ function PlayerDataService.replicate(player: Player)
 	Remotes.Events[Constants.Remotes.DataUpdated]:FireClient(player, snapshot)
 end
 
--- ── Load ────────────────────────────────────────────────────────────────────
--- Reconcile, migrate, sanitize a raw stored value into a valid profile.
-local function normalizeProfile(raw: any): Types.PlayerData
-	local data: any = raw
-	if type(data) ~= "table" then
-		data = PlayerDataService.getDefaultProfile()
-	end
-	data = PlayerDataService.migrate(data)
-	TableUtility.reconcile(data, PlayerDataService.getDefaultProfile())
-	local sanitized = (DataValidator.sanitizeProfile(data))
-	return sanitized :: Types.PlayerData
-end
-
-function PlayerDataService.load(player: Player)
-	local userId = player.UserId
-	loading[userId] = true
-	loadFailed[userId] = nil
-	sessions[userId] = nil
-
-	local ds = getStore()
-	if not ds then
-		-- No store at all → treat as failed load (never overwrite real data blindly).
-		loading[userId] = nil
-		PlayerDataService.handleLoadFailure(player)
-		return
-	end
-
-	local key = keyFor(userId)
-	local loaded: any = nil
-	local success = false
-
-	for attempt = 1, GameConfig.MaxDataStoreRetries do
-		local ok, result = pcall(function()
-			return ds:GetAsync(key)
-		end)
-		if ok then
-			loaded = result
-			success = true
-			break
-		end
-		warn(`[PlayerDataService] GetAsync attempt {attempt} failed for {userId}: {result}`)
-		if attempt < GameConfig.MaxDataStoreRetries then
-			task.wait(2 ^ (attempt - 1))
-		end
-	end
-
-	if not success then
-		loading[userId] = nil
-		PlayerDataService.handleLoadFailure(player)
-		return
-	end
-
-	if player.Parent ~= Players then
-		-- Player left during load; abandon quietly.
-		loading[userId] = nil
-		return
-	end
-
-	local profile = normalizeProfile(loaded)
-
-	-- Offline growth note: ReadyAt is absolute os.time(), so crops keep growing
-	-- while offline automatically (§15). LastSeenAt is informational for the client.
-	profile.LastSeenAt = os.time()
-
-	sessions[userId] = profile
-	dirty[userId] = false
-	loading[userId] = nil
-	loadFailed[userId] = nil
-end
-
 -- Failed-load guard: block gameplay, notify, kick, never save (§14).
 function PlayerDataService.handleLoadFailure(player: Player)
 	local userId = player.UserId
 	loadFailed[userId] = true
 	sessions[userId] = nil
+	profiles[userId] = nil
 	dirty[userId] = nil
 
 	if player.Parent == Players then
-		local ok = pcall(function()
+		pcall(function()
 			Remotes.Events[Constants.Remotes.Notification]:FireClient(
 				player,
 				"Could not load your save. Please rejoin in a moment.",
 				2
 			)
 		end)
-		local _ = ok
 		task.delay(1, function()
 			if player.Parent == Players then
 				player:Kick("Your data failed to load. Please rejoin — your progress is safe.")
@@ -331,55 +299,91 @@ function PlayerDataService.handleLoadFailure(player: Player)
 	end
 end
 
--- ── Save ─────────────────────────────────────────────────────────────────────
+-- ── Load (start a ProfileStore session) ─────────────────────────────────────
+function PlayerDataService.load(player: Player)
+	local userId = player.UserId
+	loading[userId] = true
+	loadFailed[userId] = nil
+	sessions[userId] = nil
+
+	-- Cancel the (potentially long, lock-contended) session start if the player
+	-- leaves first — ProfileStore returns nil in that case.
+	local profile = profileStore:StartSessionAsync(keyFor(userId), {
+		Cancel = function()
+			return player.Parent ~= Players
+		end,
+	})
+
+	if profile == nil then
+		loading[userId] = nil
+		if player.Parent ~= Players then
+			-- Player left during the load; not a failure, just abandon quietly.
+			return
+		end
+		-- Genuinely could not acquire the session lock → failed-load guard.
+		PlayerDataService.handleLoadFailure(player)
+		return
+	end
+
+	profile:AddUserId(userId) -- GDPR association
+	-- Order matters: migrate old fields first, then reconcile fills the template,
+	-- then sanitize clamps/repairs. All operate IN PLACE on profile.Data.
+	PlayerDataService.migrate(profile.Data)
+	profile:Reconcile()
+	DataValidator.sanitizeProfile(profile.Data)
+
+	-- The session can end out from under us if another server steals the lock or the
+	-- game closes — tear down and kick so the player rejoins cleanly (no double-data).
+	profile.OnSessionEnd:Connect(function()
+		sessions[userId] = nil
+		profiles[userId] = nil
+		if player.Parent == Players then
+			player:Kick("Your save was opened elsewhere. Please rejoin — your progress is safe.")
+		end
+	end)
+
+	if player.Parent ~= Players then
+		-- Left right as the session opened: release the lock immediately.
+		profile:EndSession()
+		loading[userId] = nil
+		return
+	end
+
+	-- Offline growth note: ReadyAt is absolute os.time(), so crops keep growing while
+	-- offline automatically (§15); LastSeenAt is informational for the client.
+	profile.Data.LastSeenAt = os.time()
+
+	profiles[userId] = profile
+	sessions[userId] = profile.Data
+	loadFailed[userId] = nil
+	loading[userId] = nil
+
+	setupLeaderstats(player)
+	PlayerDataService.replicate(player)
+end
+
+-- ── Save (manual flush; ProfileStore also auto-saves + saves on EndSession) ──
 function PlayerDataService.save(player: Player, reason: string?)
 	local userId = player.UserId
-
-	-- NEVER save a failed/never-loaded session (would clobber real data, §14).
 	if loadFailed[userId] then
-		return
+		return -- never persist a failed/never-loaded session (§14)
 	end
-	local data = sessions[userId]
-	if not data then
-		return
-	end
-
-	local ds = getStore()
-	if not ds then
-		warn(`[PlayerDataService] cannot save {userId}: no DataStore`)
+	local profile = profiles[userId]
+	if not profile or profile:IsActive() ~= true then
 		return
 	end
 
-	-- Sanitize + stamp LastSeenAt right before persisting.
-	DataValidator.sanitizeProfile(data)
-	data.LastSeenAt = os.time()
-	local payload = TableUtility.deepCopy(data)
+	-- Sanitize + stamp LastSeenAt right before persisting (in place).
+	DataValidator.sanitizeProfile(profile.Data)
+	profile.Data.LastSeenAt = os.time()
 
-	local key = keyFor(userId)
-	local saved = false
-
-	for attempt = 1, GameConfig.MaxDataStoreRetries do
-		local ok, err = pcall(function()
-			ds:UpdateAsync(key, function(_old)
-				-- Last-write-wins on this single key; the session cache is authoritative
-				-- for an online player, so we replace rather than merge.
-				return payload
-			end)
-		end)
-		if ok then
-			saved = true
-			break
-		end
-		warn(`[PlayerDataService] UpdateAsync attempt {attempt} failed for {userId}: {err}`)
-		if attempt < GameConfig.MaxDataStoreRetries then
-			task.wait(2 ^ (attempt - 1))
-		end
-	end
-
-	if saved then
+	local ok, err = pcall(function()
+		profile:Save()
+	end)
+	if ok then
 		dirty[userId] = false
 	else
-		warn(`[PlayerDataService] save FAILED for {userId} (reason={reason or "?"})`)
+		warn(`[PlayerDataService] save FAILED for {userId} (reason={reason or "?"}): {err}`)
 	end
 end
 
@@ -390,13 +394,20 @@ end
 
 local function onPlayerRemoving(player: Player)
 	local userId = player.UserId
-	PlayerDataService.save(player, "PlayerRemoving")
-	-- Tear down session state.
+	local profile = profiles[userId]
+	if profile then
+		-- EndSession performs a final save AND releases the lock.
+		pcall(function()
+			profile:EndSession()
+		end)
+	end
 	sessions[userId] = nil
+	profiles[userId] = nil
 	loadFailed[userId] = nil
 	loading[userId] = nil
 	dirty[userId] = nil
 	passes[userId] = nil
+	plotIds[userId] = nil
 	limiter:clear(tostring(userId))
 end
 
@@ -407,8 +418,12 @@ function PlayerDataService.Init()
 	-- UpdateSettings intent (contract §3) — guarded by RateLimiter + RemoteValidator.
 	Remotes.Events[Constants.Remotes.UpdateSettings].OnServerEvent:Connect(
 		function(player, settings)
-			local key = `{player.UserId}:UpdateSettings`
-			if not limiter:allow(key, Constants.RateLimits.UpdateSettings) then
+			if
+				not limiter:allow(
+					`{player.UserId}:UpdateSettings`,
+					Constants.RateLimits.UpdateSettings
+				)
+			then
 				return
 			end
 			local clean = RemoteValidator.validateSettings(settings)
@@ -420,8 +435,7 @@ function PlayerDataService.Init()
 	)
 
 	-- RequestData RemoteFunction — lets a (re)connecting client pull the current
-	-- snapshot on demand instead of waiting for the next push. Rate-limited; returns
-	-- nil while the load is still in flight / failed.
+	-- snapshot on demand. Rate-limited; returns nil while load is in flight / failed.
 	Remotes.Functions[Constants.RemoteFunctions.RequestData].OnServerInvoke = function(player)
 		if not limiter:allow(`{player.UserId}:RequestData`, Constants.RateLimits.Default) then
 			return nil
@@ -434,28 +448,19 @@ function PlayerDataService.Init()
 		task.spawn(onPlayerAdded, player)
 	end
 
-	game:BindToClose(function()
-		if RunService:IsStudio() then
-			return
-		end
-		for _, player in Players:GetPlayers() do
-			task.spawn(function()
-				PlayerDataService.save(player, "BindToClose")
-			end)
-		end
-		-- Give saves a brief window to flush.
-		task.wait(3)
-	end)
+	-- NOTE: ProfileStore installs its own game:BindToClose to end every active
+	-- session (final save + lock release) on shutdown, so we do not add one here.
 end
 
 function PlayerDataService.Start()
-	-- Autosave loop: save every dirty session on the configured interval.
+	-- 60s save cadence for dirty sessions (ProfileStore also auto-saves on its own
+	-- longer interval; this tightens the worst-case loss window on a hard crash).
 	task.spawn(function()
 		while true do
 			task.wait(GameConfig.AutosaveIntervalSeconds)
 			for _, player in Players:GetPlayers() do
 				local userId = player.UserId
-				if dirty[userId] and not loadFailed[userId] and sessions[userId] then
+				if dirty[userId] and PlayerDataService.isLoaded(userId) then
 					task.spawn(function()
 						PlayerDataService.save(player, "Autosave")
 					end)

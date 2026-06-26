@@ -2,3 +2,6 @@
 # Uses the Roblox standard library. If selene reports unknown globals like `game`,
 # run `selene generate-roblox-std` once to write roblox.yml next to this file.
 std = "roblox"
+
+# Vendored third-party libraries are not linted to our ruleset.
+exclude = ["src/ServerScriptService/Server/Vendor/**"]

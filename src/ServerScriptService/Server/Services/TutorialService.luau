@@ -58,6 +58,17 @@ function TutorialService.isGuaranteedPlantStep(userId: number): boolean
 	return not data.Tutorial.Completed and data.Tutorial.Step == TutorialService.Steps.Welcome
 end
 
+-- True while the (already-planted) tutorial crop is the one being harvested — used
+-- by FarmService to pay the guaranteed flat TutorialReward instead of a rolled payout.
+function TutorialService.isGuaranteedHarvestStep(userId: number): boolean
+	local data = PlayerDataService.get(userId)
+	if not data then
+		return false
+	end
+	return not data.Tutorial.Completed
+		and data.Tutorial.Step == TutorialService.Steps.PlantedTutorialCrop
+end
+
 -- Replicate the current tutorial state to the client (§16 TutorialUpdated).
 function TutorialService.replicate(player: Player)
 	local data = PlayerDataService.get(player.UserId)

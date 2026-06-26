@@ -1,0 +1,2 @@
+# Vendored third-party libraries are kept in their upstream formatting.
+src/ServerScriptService/Server/Vendor/

@@ -230,6 +230,19 @@ function UIController.Start()
 			end
 		)
 	)
+
+	-- Pull the current snapshot once, now that our listeners are connected, so an
+	-- initial server push fired before we were ready isn't lost (server stays the
+	-- authority — this is only a fetch). The snapshot carries PlotId, so listeners
+	-- (FarmController) can also recover the plot if FarmAssigned was missed.
+	task.spawn(function()
+		local ok, result = pcall(function()
+			return Remotes.Functions[Constants.RemoteFunctions.RequestData]:InvokeServer()
+		end)
+		if ok and result then
+			applySnapshot(result)
+		end
+	end)
 end
 
 return UIController
