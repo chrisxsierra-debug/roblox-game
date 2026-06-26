@@ -1,0 +1,7 @@
+{
+	"languageMode": "strict",
+	"lintErrors": false,
+	"aliases": {
+		"shared": "src/ReplicatedStorage/Shared"
+	}
+}

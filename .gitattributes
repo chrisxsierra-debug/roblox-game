@@ -1,0 +1,9 @@
+# Enforce LF for source + config so StyLua (line_endings = "Unix") and teammates
+# on different OSes stay consistent.
+*.luau text eol=lf
+*.lua text eol=lf
+*.toml text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+.luaurc text eol=lf
+.gitignore text eol=lf

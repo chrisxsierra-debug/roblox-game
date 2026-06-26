@@ -1,21 +1,28 @@
-# Roblox place files (keep in Roblox Studio, not git)
+# Roblox / Rojo build artifacts
 *.rbxl
 *.rbxlx
-*.rbxm
-*.rbxmx
+*.rbxl.lock
+*.rbxlx.lock
+/build/
+build.rbxlx
+build.rbxl
 
-# Rojo / build outputs
-build/
-dist/
+# Locally installed toolchain binaries (teammates install via rokit; see rokit.toml)
+/bin/
+.rokit/
 
-# Package managers
-node_modules/
-package-lock.json
+# Lune
+.lune/
 
-# OS files
+# Selene generated Roblox std (regenerate with `selene generate-roblox-std`)
+roblox.yml
+
+# Editor / OS
+.vscode/
+.idea/
 .DS_Store
 Thumbs.db
+*.log
 
-# Editor
-.vscode/
-*.suo
+# Node (only present if local tooling needs it)
+node_modules/

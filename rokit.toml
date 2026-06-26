@@ -1,0 +1,9 @@
+# Toolchain manifest for Brainrot Farm.
+# Install rokit (https://github.com/rojo-rbx/rokit), then run `rokit install`
+# in this folder to get the exact same tools every teammate uses.
+# (These versions were used to lint/format/test/build this foundation.)
+[tools]
+rojo = "rojo-rbx/rojo@7.6.1"
+lune = "lune-org/lune@0.10.4"
+selene = "Kampfkarren/selene@0.31.0"
+stylua = "JohnnyMorganz/StyLua@2.5.2"

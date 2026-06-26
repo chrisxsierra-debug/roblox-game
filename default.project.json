@@ -1,0 +1,38 @@
+{
+	"name": "BrainrotFarm",
+	"globIgnorePaths": ["**/*.spec.luau", "**/*.test.luau"],
+	"tree": {
+		"$className": "DataModel",
+
+		"ReplicatedStorage": {
+			"Shared": {
+				"$path": "src/ReplicatedStorage/Shared"
+			},
+			"Remotes": {
+				"$path": "src/ReplicatedStorage/Remotes"
+			}
+		},
+
+		"ServerScriptService": {
+			"Server": {
+				"$path": "src/ServerScriptService/Server"
+			},
+			"ServerBootstrap": {
+				"$path": "src/ServerScriptService/ServerBootstrap.server.luau"
+			}
+		},
+
+		"StarterPlayer": {
+			"$className": "StarterPlayer",
+			"StarterPlayerScripts": {
+				"$className": "StarterPlayerScripts",
+				"FarmClient": {
+					"$path": "src/StarterPlayer/StarterPlayerScripts/FarmClient.client.luau"
+				},
+				"Client": {
+					"$path": "src/StarterPlayer/StarterPlayerScripts/Client"
+				}
+			}
+		}
+	}
+}
