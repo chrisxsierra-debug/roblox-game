@@ -172,3 +172,4 @@ RunService.RenderStepped:Connect(function()
 end)
 
 print("[ChaserTruckHUD] Truck dashboard HUD initialized (Speedometer, Nitro, Anchor Spikes).")
+
