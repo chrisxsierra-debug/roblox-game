@@ -34,7 +34,7 @@ This repository is set up with [Rojo](https://rojo.space/) so you and your team 
 
 ---
 
-### 2. Quick Start for Collaborators
+### 2. Super Easy 1-Click Start (Automatic Live Sync)
 
 1. **Clone the repository**:
    ```bash
@@ -42,22 +42,26 @@ This repository is set up with [Rojo](https://rojo.space/) so you and your team 
    cd roblox-game
    ```
 
-2. **Open the Game Place**:
-   - Double-click `game.rbxl` to open the project in Roblox Studio.
+2. **Double-click `START-ALL-SYNC.bat`**:
+   - Automatically starts the **Rojo live sync server**.
+   - Automatically starts the **GitHub auto-sync watcher** (polls for teammate commits every 10s).
+   - Automatically opens **`game.rbxl`** in Roblox Studio!
 
-3. **Start the Rojo Sync Server**:
-   - Double-click `start-rojo.bat` (or open a terminal and run `rojo serve`).
-   - The Rojo server will start listening on port `34872`.
-
-4. **Connect in Roblox Studio**:
+3. **Connect in Roblox Studio**:
    - In Roblox Studio, click the **Plugins** tab in the top ribbon.
-   - Click the **Rojo** button.
-   - Click **Connect** (address: `localhost:34872`).
+   - Click the **Rojo** button -> click **Connect** (port: `34872`).
    - You should see `Connected to Rojo!` in the Output window.
+
+That's it! Any time anyone on the team pushes to GitHub, everyone's Roblox Studio will update automatically!
 
 ---
 
-### 3. Collaboration Git Workflow
+### 3. Pushing Changes to GitHub
+
+Whenever you or your friend finish editing scripts or building:
+1. Double-click **`push-changes.bat`**.
+2. Type an optional note about what you changed and hit Enter.
+3. It rebuilds `game.rbxl`, integrates any teammate commits, and pushes everything to GitHub!
 
 Whenever you or your friend want to work on the game:
 
