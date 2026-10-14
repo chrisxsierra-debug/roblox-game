@@ -50,16 +50,19 @@ local function removeTemplateParts()
 end
 
 local function setupStormLighting()
-	-- High-visibility daylight supercell storm lighting: bright, sunny, crystal clear
-	Lighting.ClockTime = 13.8
-	Lighting.Brightness = 3.8
-	Lighting.Ambient = Color3.fromRGB(195, 205, 215)
-	Lighting.OutdoorAmbient = Color3.fromRGB(218, 228, 238)
-	Lighting.ExposureCompensation = 0.85
+	-- Silent Hill atmospheric daylight fog: luminous, pearlescent silver-white mist
+	Lighting.ClockTime = 14.0
+	Lighting.Brightness = 3.2
+	Lighting.Ambient = Color3.fromRGB(180, 185, 195)
+	Lighting.OutdoorAmbient = Color3.fromRGB(205, 212, 222)
+	Lighting.ExposureCompensation = 0.65
 	Lighting.EnvironmentDiffuseScale = 1.0
-	Lighting.EnvironmentSpecularScale = 0.8
+	Lighting.EnvironmentSpecularScale = 0.85
 	Lighting.GlobalShadows = true
-	Lighting.ShadowSoftness = 0.75
+	Lighting.ShadowSoftness = 0.8
+	Lighting.FogColor = Color3.fromRGB(212, 218, 225)
+	Lighting.FogStart = 20
+	Lighting.FogEnd = 200
 
 	local sky = Lighting:FindFirstChildOfClass("Sky")
 	if not sky then
@@ -75,12 +78,12 @@ local function setupStormLighting()
 		atmosphere.Name = "StormAtmosphere"
 		atmosphere.Parent = Lighting
 	end
-	atmosphere.Density = 0.06
-	atmosphere.Offset = 0.25
-	atmosphere.Color = Color3.fromRGB(195, 215, 235)
-	atmosphere.Decay = Color3.fromRGB(165, 185, 205)
-	atmosphere.Glare = 0.2
-	atmosphere.Haze = 0.1
+	atmosphere.Density = 0.44
+	atmosphere.Offset = 0.18
+	atmosphere.Color = Color3.fromRGB(215, 222, 230)
+	atmosphere.Decay = Color3.fromRGB(180, 190, 200)
+	atmosphere.Glare = 0.25
+	atmosphere.Haze = 0.35
 
 	local colorCorrection = Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
 	if not colorCorrection then
@@ -88,10 +91,10 @@ local function setupStormLighting()
 		colorCorrection.Name = "StormColorCorrection"
 		colorCorrection.Parent = Lighting
 	end
-	colorCorrection.Brightness = 0.10
-	colorCorrection.Contrast = 0.06
-	colorCorrection.Saturation = 0.12
-	colorCorrection.TintColor = Color3.fromRGB(255, 255, 255)
+	colorCorrection.Brightness = 0.05
+	colorCorrection.Contrast = 0.14
+	colorCorrection.Saturation = -0.15
+	colorCorrection.TintColor = Color3.fromRGB(240, 246, 252)
 
 	local bloom = Lighting:FindFirstChildOfClass("BloomEffect")
 	if not bloom then
@@ -99,18 +102,18 @@ local function setupStormLighting()
 		bloom.Parent = Lighting
 	end
 	bloom.Intensity = 0.2
-	bloom.Size = 18
-	bloom.Threshold = 1.1
+	bloom.Size = 20
+	bloom.Threshold = 1.0
 
-	-- Light, translucent clouds that do NOT cast dense dark shadows
+	-- Translucent silver-white cloud ceiling
 	local oldClouds = Terrain:FindFirstChildOfClass("Clouds")
 	if oldClouds then
 		oldClouds:Destroy()
 	end
 	local clouds = Instance.new("Clouds")
-	clouds.Cover = 0.35
-	clouds.Density = 0.25
-	clouds.Color = Color3.fromRGB(240, 245, 255)
+	clouds.Cover = 0.5
+	clouds.Density = 0.35
+	clouds.Color = Color3.fromRGB(225, 230, 238)
 	clouds.Parent = Terrain
 end
 
@@ -459,153 +462,692 @@ local function buildFenceLine(from: Vector3, to: Vector3, parent: Instance)
 	end
 end
 
-local function buildFarm(parent: Instance)
-	local house = Instance.new("Model")
-	house.Name = "DestructibleFarmhouse"
-
-	local houseCenter = Vector3.new(-65, 1, -20)
+local function buildVintageLamppost(pos: Vector3, parent: Instance)
+	local postModel = Instance.new("Model")
+	postModel.Name = "VintageLamppost"
 
 	makePart({
+		Name = "Plinth",
+		Size = Vector3.new(2, 1.2, 2),
+		Position = pos + Vector3.new(0, 0.6, 0),
+		Color = Color3.fromRGB(35, 38, 42),
+		Material = Enum.Material.Metal,
+	}, postModel)
+
+	makePart({
+		Name = "Pole",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(14, 0.9, 0.9),
+		CFrame = CFrame.new(pos + Vector3.new(0, 7.6, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = Color3.fromRGB(38, 42, 46),
+		Material = Enum.Material.Metal,
+	}, postModel)
+
+	makePart({
+		Name = "Arm",
+		Size = Vector3.new(1.8, 0.8, 1.8),
+		Position = pos + Vector3.new(0, 14.8, 0),
+		Color = Color3.fromRGB(35, 38, 42),
+		Material = Enum.Material.Metal,
+	}, postModel)
+
+	local globe = makePart({
+		Name = "GlassGlobe",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(2.4, 2.4, 2.4),
+		Position = pos + Vector3.new(0, 16.2, 0),
+		Color = Color3.fromRGB(255, 248, 220),
+		Material = Enum.Material.Neon,
+	}, postModel)
+
+	makePart({
+		Name = "GlobeCap",
+		Size = Vector3.new(2.2, 0.6, 2.2),
+		Position = pos + Vector3.new(0, 17.5, 0),
+		Color = Color3.fromRGB(32, 35, 38),
+		Material = Enum.Material.Metal,
+	}, postModel)
+
+	local light = Instance.new("PointLight")
+	light.Color = Color3.fromRGB(255, 235, 195)
+	light.Brightness = 3.8
+	light.Range = 36
+	light.Shadows = true
+	light.Parent = globe
+
+	postModel.Parent = parent
+end
+
+local function buildAbandonedCar(cf: CFrame, carType: string, parent: Instance)
+	local car = Instance.new("Model")
+	car.Name = "AbandonedCar_" .. carType
+
+	destructible(makePart({
+		Name = "Chassis",
+		Size = Vector3.new(7.6, 1.4, 16),
+		CFrame = cf * CFrame.new(0, 1.4, 0),
+		Color = Color3.fromRGB(45, 48, 52),
+		Material = Enum.Material.Metal,
+	}, car))
+
+	for _, offset in {
+		Vector3.new(-3.9, -0.6, 4.8),
+		Vector3.new(3.9, -0.6, 4.8),
+		Vector3.new(-3.9, -0.6, -4.8),
+		Vector3.new(3.9, -0.6, -4.8),
+	} do
+		destructible(makePart({
+			Name = "FlatTire",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(1.1, 2.8, 2.8),
+			CFrame = cf * CFrame.new(offset) * CFrame.Angles(0, 0, math.rad(90)),
+			Color = Color3.fromRGB(25, 25, 28),
+			Material = Enum.Material.Rubber,
+		}, car))
+	end
+
+	if carType == "StationWagon" then
+		destructible(makePart({
+			Name = "Body",
+			Size = Vector3.new(7.4, 2.8, 15.6),
+			CFrame = cf * CFrame.new(0, 3.2, 0),
+			Color = Color3.fromRGB(140, 120, 95),
+			Material = Enum.Material.Metal,
+		}, car))
+
+		for _, side in { -3.75, 3.75 } do
+			destructible(makePart({
+				Name = "WoodgrainPanel",
+				Size = Vector3.new(0.2, 1.6, 13.5),
+				CFrame = cf * CFrame.new(side, 3.0, 0),
+				Color = Color3.fromRGB(115, 68, 36),
+				Material = Enum.Material.WoodPlanks,
+			}, car))
+		end
+
+		for _, side in { -2.8, 2.8 } do
+			destructible(makePart({
+				Name = "RoofRail",
+				Size = Vector3.new(0.3, 0.4, 8),
+				CFrame = cf * CFrame.new(side, 4.8, -1),
+				Color = Color3.fromRGB(180, 180, 185),
+				Material = Enum.Material.Metal,
+			}, car))
+		end
+
+		destructible(makePart({
+			Name = "Windshield",
+			Size = Vector3.new(6.8, 1.8, 0.3),
+			CFrame = cf * CFrame.new(0, 3.8, -4.2) * CFrame.Angles(math.rad(25), 0, 0),
+			Color = Color3.fromRGB(60, 75, 85),
+			Material = Enum.Material.Glass,
+			Transparency = 0.3,
+			Reflectance = 0.3,
+		}, car))
+
+		destructible(makePart({
+			Name = "Bumper",
+			Size = Vector3.new(7.8, 0.9, 0.8),
+			CFrame = cf * CFrame.new(0, 1.8, -8.1),
+			Color = Color3.fromRGB(200, 200, 205),
+			Material = Enum.Material.Metal,
+		}, car))
+
+	elseif carType == "Sedan" then
+		destructible(makePart({
+			Name = "Hood",
+			Size = Vector3.new(7.2, 1.8, 5.5),
+			CFrame = cf * CFrame.new(0, 2.5, -4.8),
+			Color = Color3.fromRGB(120, 138, 130),
+			Material = Enum.Material.Metal,
+		}, car))
+
+		destructible(makePart({
+			Name = "Cabin",
+			Size = Vector3.new(6.8, 2.4, 6.5),
+			CFrame = cf * CFrame.new(0, 3.8, 0.5),
+			Color = Color3.fromRGB(120, 138, 130),
+			Material = Enum.Material.Metal,
+		}, car))
+
+		destructible(makePart({
+			Name = "Trunk",
+			Size = Vector3.new(7.2, 1.6, 4.2),
+			CFrame = cf * CFrame.new(0, 2.4, 5.4),
+			Color = Color3.fromRGB(115, 130, 125),
+			Material = Enum.Material.Metal,
+		}, car))
+
+		destructible(makePart({
+			Name = "Windshield",
+			Size = Vector3.new(6.4, 2, 0.3),
+			CFrame = cf * CFrame.new(0, 3.6, -2.8) * CFrame.Angles(math.rad(28), 0, 0),
+			Color = Color3.fromRGB(55, 70, 80),
+			Material = Enum.Material.Glass,
+			Transparency = 0.35,
+			Reflectance = 0.25,
+		}, car))
+
+		destructible(makePart({
+			Name = "FrontBumper",
+			Size = Vector3.new(7.6, 0.8, 0.7),
+			CFrame = cf * CFrame.new(0, 1.6, -7.8),
+			Color = Color3.fromRGB(195, 195, 200),
+			Material = Enum.Material.Metal,
+		}, car))
+
+	elseif carType == "Pickup" then
+		destructible(makePart({
+			Name = "Hood",
+			Size = Vector3.new(7.4, 2.2, 5.2),
+			CFrame = cf * CFrame.new(0, 2.8, -4.5),
+			Color = Color3.fromRGB(140, 75, 45),
+			Material = Enum.Material.CorrodedMetal,
+		}, car))
+
+		destructible(makePart({
+			Name = "Cab",
+			Size = Vector3.new(7.2, 3.2, 4.8),
+			CFrame = cf * CFrame.new(0, 4.2, 0),
+			Color = Color3.fromRGB(135, 70, 40),
+			Material = Enum.Material.CorrodedMetal,
+		}, car))
+
+		destructible(makePart({
+			Name = "BedFloor",
+			Size = Vector3.new(7.2, 0.8, 6.5),
+			CFrame = cf * CFrame.new(0, 2.2, 5.4),
+			Color = Color3.fromRGB(110, 60, 35),
+			Material = Enum.Material.CorrodedMetal,
+		}, car))
+		for _, side in { -3.6, 3.6 } do
+			destructible(makePart({
+				Name = "BedWall",
+				Size = Vector3.new(0.5, 2.2, 6.5),
+				CFrame = cf * CFrame.new(side, 3.2, 5.4),
+				Color = Color3.fromRGB(125, 65, 38),
+				Material = Enum.Material.CorrodedMetal,
+			}, car))
+		end
+		destructible(makePart({
+			Name = "Tailgate",
+			Size = Vector3.new(7.2, 2.2, 0.5),
+			CFrame = cf * CFrame.new(0, 3.2, 8.6),
+			Color = Color3.fromRGB(120, 60, 35),
+			Material = Enum.Material.CorrodedMetal,
+		}, car))
+	end
+
+	car.Parent = parent
+end
+
+local function buildStorefront(
+	center: Vector3,
+	width: number,
+	depth: number,
+	floors: number,
+	title: string,
+	awningColor: Color3,
+	awningStripe: Color3,
+	parent: Instance
+)
+	local bldg = Instance.new("Model")
+	bldg.Name = "Storefront_" .. title
+
+	local totalHeight = floors * 15
+
+	-- Main Brick Shell
+	destructible(makePart({
+		Name = "Facade",
+		Size = Vector3.new(width, totalHeight, depth),
+		Position = center + Vector3.new(0, totalHeight / 2, 0),
+		Color = Color3.fromRGB(135, 65, 55),
+		Material = Enum.Material.Brick,
+	}, bldg))
+
+	-- Roof Parapet / Cornice
+	destructible(makePart({
+		Name = "Cornice",
+		Size = Vector3.new(width + 2, 2.5, depth + 2),
+		Position = center + Vector3.new(0, totalHeight + 1.25, 0),
+		Color = Color3.fromRGB(160, 160, 155),
+		Material = Enum.Material.Concrete,
+	}, bldg))
+
+	-- Display Windows
+	local facingSign = if center.X < 0 then 1 else -1
+	for _, dz in { -depth * 0.28, depth * 0.28 } do
+		destructible(makePart({
+			Name = "DisplayWindow",
+			Size = Vector3.new(0.6, 7.5, depth * 0.38),
+			Position = center + Vector3.new(facingSign * (width / 2 + 0.1), 5.5, dz),
+			Color = Color3.fromRGB(50, 65, 75),
+			Material = Enum.Material.Glass,
+			Transparency = 0.3,
+			Reflectance = 0.25,
+		}, bldg))
+	end
+
+	-- Awning over display windows (striped canvas fabric matching reference image)
+	local awningOffsetX = facingSign * (width / 2 + 3.2)
+	local awningRotZ = facingSign * math.rad(-22)
+	for i = 0, 7 do
+		local stripeColor = if i % 2 == 0 then awningColor else awningStripe
+		local stripDepth = (depth - 2) / 8
+		local sz = -depth / 2 + 1 + stripDepth * (i + 0.5)
+		destructible(makePart({
+			Name = "AwningStripe",
+			Size = Vector3.new(7, 0.4, stripDepth),
+			CFrame = CFrame.new(center + Vector3.new(awningOffsetX, 9.5, sz)) * CFrame.Angles(0, 0, awningRotZ),
+			Color = stripeColor,
+			Material = Enum.Material.Fabric,
+		}, bldg))
+	end
+
+	-- Signboard with Store Title
+	local signBoard = destructible(makePart({
+		Name = "StoreSign",
+		Size = Vector3.new(0.8, 3, depth * 0.8),
+		Position = center + Vector3.new(facingSign * (width / 2 + 0.5), 12, 0),
+		Color = Color3.fromRGB(40, 42, 45),
+		Material = Enum.Material.Wood,
+	}, bldg))
+
+	local sg = Instance.new("SurfaceGui")
+	sg.Face = if center.X < 0 then Enum.NormalId.Right else Enum.NormalId.Left
+	sg.Adornee = signBoard
+	sg.Parent = signBoard
+
+	local lbl = Instance.new("TextLabel")
+	lbl.Size = UDim2.new(1, 0, 1, 0)
+	lbl.BackgroundTransparency = 1
+	lbl.Text = title
+	lbl.TextColor3 = Color3.fromRGB(255, 235, 190)
+	lbl.Font = Enum.Font.Antique
+	lbl.TextScaled = true
+	lbl.Parent = sg
+
+	-- Second Floor Windows & Window AC Unit
+	if floors >= 2 then
+		for _, dz in { -depth * 0.3, 0, depth * 0.3 } do
+			destructible(makePart({
+				Name = "UpperWindow",
+				Size = Vector3.new(0.4, 5, 3.5),
+				Position = center + Vector3.new(facingSign * (width / 2 + 0.2), 20.5, dz),
+				Color = Color3.fromRGB(60, 75, 85),
+				Material = Enum.Material.Glass,
+				Reflectance = 0.2,
+			}, bldg))
+			destructible(makePart({
+				Name = "WindowSill",
+				Size = Vector3.new(0.8, 0.8, 4.2),
+				Position = center + Vector3.new(facingSign * (width / 2 + 0.4), 17.6, dz),
+				Color = Color3.fromRGB(180, 180, 185),
+				Material = Enum.Material.Concrete,
+			}, bldg))
+		end
+
+		destructible(makePart({
+			Name = "WindowACUnit",
+			Size = Vector3.new(2.5, 2.2, 2.8),
+			Position = center + Vector3.new(facingSign * (width / 2 + 1.2), 19.5, depth * 0.3),
+			Color = Color3.fromRGB(195, 198, 202),
+			Material = Enum.Material.Metal,
+		}, bldg))
+	end
+
+	local intLight = Instance.new("PointLight")
+	intLight.Color = Color3.fromRGB(255, 235, 190)
+	intLight.Brightness = 2.5
+	intLight.Range = 35
+	intLight.Parent = signBoard
+
+	bldg.Parent = parent
+end
+
+local function buildAbandonedHouse(pos: Vector3, rotY: number, style: number, parent: Instance)
+	local house = Instance.new("Model")
+	house.Name = "AbandonedHouse_" .. style
+
+	local cf = CFrame.new(pos) * CFrame.Angles(0, math.rad(rotY), 0)
+
+	local wallColors = {
+		Color3.fromRGB(95, 115, 130),  -- Weathered blue-gray weatherboard
+		Color3.fromRGB(195, 195, 190), -- Peeling white colonial
+		Color3.fromRGB(80, 62, 48),    -- Dark craftsman wood
+		Color3.fromRGB(135, 60, 50),   -- Aged red brick
+		Color3.fromRGB(160, 150, 135), -- Weathered stucco
+		Color3.fromRGB(65, 70, 75),    -- Dark Victorian slate
+	}
+	local wallMat = if style == 4 then Enum.Material.Brick else Enum.Material.WoodPlanks
+	local wallColor = wallColors[((style - 1) % #wallColors) + 1]
+
+	-- Foundation
+	makePart({
 		Name = "Foundation",
-		Size = Vector3.new(42, 2, 52),
-		Position = houseCenter + Vector3.new(0, 1, 0),
-		Color = Color3.fromRGB(115, 115, 120),
+		Size = Vector3.new(36, 1.8, 42),
+		CFrame = cf * CFrame.new(0, 0.9, 0),
+		Color = Color3.fromRGB(120, 120, 125),
 		Material = Enum.Material.Concrete,
 	}, house)
 
-	-- Front/back walls (planks run along X) and side walls (planks run along Z)
-	for y = 4, 18, 3.5 do
-		for x = -18, 18, 9 do
-			for _, z in { -25, 25 } do
-				destructible(makePart({
-					Name = "WallPlank",
-					Size = Vector3.new(8.5, 3.2, 1.2),
-					Position = houseCenter + Vector3.new(x, y, z),
-					Color = BARN_RED,
-					Material = Enum.Material.WoodPlanks,
-				}, house))
-			end
-		end
-		for i = -2, 2 do
-			for _, x in { -21.4, 21.4 } do
-				destructible(makePart({
-					Name = "WallPlank",
-					Size = Vector3.new(1.2, 3.2, 9.5),
-					Position = houseCenter + Vector3.new(x, y, i * 9.6),
-					Color = BARN_RED,
-					Material = Enum.Material.WoodPlanks,
-				}, house))
-			end
-		end
+	-- Ground Floor Walls
+	local wallH = 14
+	destructible(makePart({
+		Name = "HouseBody",
+		Size = Vector3.new(34, wallH, 40),
+		CFrame = cf * CFrame.new(0, 1.8 + wallH / 2, 0),
+		Color = wallColor,
+		Material = wallMat,
+	}, house))
+
+	-- Front Porch Deck & Steps
+	local porchZ = 20 + 4
+	destructible(makePart({
+		Name = "PorchDeck",
+		Size = Vector3.new(34, 1.2, 8),
+		CFrame = cf * CFrame.new(0, 1.6, porchZ),
+		Color = Color3.fromRGB(90, 70, 52),
+		Material = Enum.Material.WoodPlanks,
+	}, house))
+
+	for _, px in { -15, 0, 15 } do
+		destructible(makePart({
+			Name = "PorchPost",
+			Size = Vector3.new(1.2, 10, 1.2),
+			CFrame = cf * CFrame.new(px, 6.8, porchZ + 3.2),
+			Color = Color3.fromRGB(180, 180, 175),
+			Material = Enum.Material.Wood,
+		}, house))
 	end
 
-	-- Gable ends: two wedges per end, rising toward the ridge at x = 0
-	for _, z in { -25, 25 } do
+	destructible(makePart({
+		Name = "PorchRoof",
+		Size = Vector3.new(36, 1, 9),
+		CFrame = cf * CFrame.new(0, 12.2, porchZ) * CFrame.Angles(math.rad(-12), 0, 0),
+		Color = Color3.fromRGB(130, 135, 140),
+		Material = Enum.Material.CorrodedMetal,
+	}, house))
+
+	local roofPeakY = 1.8 + wallH + 9
+	for _, side in { -1, 1 } do
+		destructible(makePart({
+			Name = "RoofPanel",
+			Size = Vector3.new(20, 1.2, 44),
+			CFrame = cf * CFrame.new(side * 9, roofPeakY - 4, 0) * CFrame.Angles(0, 0, math.rad(-side * 28)),
+			Color = Color3.fromRGB(110, 115, 120),
+			Material = Enum.Material.CorrodedMetal,
+		}, house))
+	end
+
+	for _, gz in { -20, 20 } do
 		for _, side in { -1, 1 } do
-			local center = houseCenter + Vector3.new(side * 10.7, 19.6 + 5, z)
 			destructible(makePart({
 				ClassName = "WedgePart",
 				Name = "Gable",
-				Size = Vector3.new(1.2, 10, 21.4),
-				CFrame = CFrame.fromMatrix(center, Vector3.new(0, 0, side), Vector3.yAxis),
-				Color = BARN_RED,
+				Size = Vector3.new(1.2, 8, 17),
+				CFrame = cf * CFrame.new(side * 8.5, roofPeakY - 4, gz) * CFrame.Angles(0, if gz > 0 then math.rad(90) else math.rad(-90), 0) * CFrame.Angles(0, 0, if side > 0 then 0 else math.rad(180)),
+				Color = wallColor,
+				Material = wallMat,
+			}, house))
+		end
+	end
+
+	destructible(makePart({
+		Name = "Chimney",
+		Size = Vector3.new(4, 22, 4),
+		CFrame = cf * CFrame.new(-12, 14, -8),
+		Color = Color3.fromRGB(140, 55, 45),
+		Material = Enum.Material.Brick,
+	}, house))
+
+	-- Boarded-up Windows
+	for _, wx in { -9, 9 } do
+		destructible(makePart({
+			Name = "WindowFrame",
+			Size = Vector3.new(4.8, 5.2, 0.4),
+			CFrame = cf * CFrame.new(wx, 8, 20.2),
+			Color = Color3.fromRGB(210, 210, 205),
+			Material = Enum.Material.Wood,
+		}, house))
+		for _, pAngle in { -20, 20, 0 } do
+			destructible(makePart({
+				Name = "BoardedPlank",
+				Size = Vector3.new(5.6, 1, 0.3),
+				CFrame = cf * CFrame.new(wx, 8, 20.5) * CFrame.Angles(0, 0, math.rad(pAngle)),
+				Color = Color3.fromRGB(80, 58, 40),
 				Material = Enum.Material.WoodPlanks,
 			}, house))
 		end
 	end
 
-	-- Tin roof sloping down from the ridge on both sides
-	for z = -20, 20, 10 do
-		for _, side in { -1, 1 } do
+	for fx = -18, 18, 5 do
+		if math.abs(fx) > 4 then
 			destructible(makePart({
-				Name = "RoofPanel",
-				Size = Vector3.new(24, 1.2, 10.5),
-				CFrame = CFrame.new(houseCenter + Vector3.new(side * 11, 25.5, z)) * CFrame.Angles(0, 0, math.rad(-side * 25)),
-				Color = Color3.fromRGB(150, 155, 160),
-				Material = Enum.Material.CorrodedMetal,
+				Name = "PicketPost",
+				Size = Vector3.new(0.6, 4.2, 0.6),
+				CFrame = cf * CFrame.new(fx, 2.1, 32) * CFrame.Angles(0, 0, math.rad((fx % 3) * 6 - 6)),
+				Color = Color3.fromRGB(190, 190, 185),
+				Material = Enum.Material.Wood,
 			}, house))
 		end
 	end
-	makePart({
-		Name = "RidgeCap",
-		Size = Vector3.new(2, 1, 54),
-		Position = houseCenter + Vector3.new(0, 30.8, 0),
-		Color = Color3.fromRGB(120, 125, 130),
-		Material = Enum.Material.CorrodedMetal,
-	}, house)
 
-	-- Door and windows
-	destructible(makePart({ Name = "Door", Size = Vector3.new(6, 9, 0.4), Position = houseCenter + Vector3.new(0, 6.5, -25.8), Color = Color3.fromRGB(70, 50, 35), Material = Enum.Material.Wood }, house))
-	for _, z in { -25.8, 25.8 } do
-		for _, x in { -12, 12 } do
-			destructible(makePart({ Name = "WindowTrim", Size = Vector3.new(5.6, 4.6, 0.3), Position = houseCenter + Vector3.new(x, 11, z), Color = Color3.fromRGB(235, 230, 220), Material = Enum.Material.Wood }, house))
-			destructible(makePart({ Name = "Window", Size = Vector3.new(4.8, 3.8, 0.3), Position = houseCenter + Vector3.new(x, 11, z + math.sign(z) * 0.1), Color = Color3.fromRGB(45, 55, 65), Material = Enum.Material.Glass, Reflectance = 0.2 }, house))
+	local porchLantern = makePart({
+		Name = "PorchLantern",
+		Size = Vector3.new(0.8, 1.2, 0.8),
+		CFrame = cf * CFrame.new(4, 9, 20.6),
+		Color = Color3.fromRGB(255, 240, 210),
+		Material = Enum.Material.Neon,
+	}, house)
+	local pLight = Instance.new("PointLight")
+	pLight.Color = Color3.fromRGB(255, 230, 190)
+	pLight.Brightness = 2.5
+	pLight.Range = 28
+	pLight.Parent = porchLantern
+
+	house.Parent = parent
+end
+
+local function buildGroundFogEmitter(pos: Vector3, size: Vector3, parent: Instance)
+	local fogPart = Instance.new("Part")
+	fogPart.Name = "GroundFogZone"
+	fogPart.Size = size
+	fogPart.Position = pos
+	fogPart.Anchored = true
+	fogPart.CanCollide = false
+	fogPart.CanQuery = false
+	fogPart.CanTouch = false
+	fogPart.Transparency = 1
+	fogPart.Parent = parent
+
+	local emitter = Instance.new("ParticleEmitter")
+	emitter.Name = "RollingMist"
+	emitter.Texture = "rbxasset://textures/particles/smoke_main.dds"
+	emitter.Rate = 6
+	emitter.Lifetime = NumberRange.new(9, 15)
+	emitter.Speed = NumberRange.new(1.5, 4)
+	emitter.SpreadAngle = Vector2.new(180, 0)
+	emitter.EmissionDirection = Enum.NormalId.Top
+	emitter.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 22),
+		NumberSequenceKeypoint.new(0.5, 52),
+		NumberSequenceKeypoint.new(1, 68),
+	})
+	emitter.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 1),
+		NumberSequenceKeypoint.new(0.18, 0.88),
+		NumberSequenceKeypoint.new(0.82, 0.93),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	emitter.Color = ColorSequence.new(Color3.fromRGB(225, 230, 238))
+	emitter.LightInfluence = 0.8
+	emitter.Parent = fogPart
+end
+
+local function buildSilentHillTown(parent: Instance)
+	local town = Instance.new("Model")
+	town.Name = "SilentHillTown"
+
+	-- Main Street (Wet reflective asphalt matching the reference image)
+	makePart({
+		Name = "MainStreetRoad",
+		Size = Vector3.new(38, 1.2, 500),
+		Position = Vector3.new(0, 1.1, 0),
+		Color = Color3.fromRGB(45, 48, 52),
+		Material = Enum.Material.SmoothPlastic,
+		Reflectance = 0.32,
+	}, town)
+
+	-- Double yellow centerlines
+	for _, x in { -1.0, 1.0 } do
+		makePart({
+			Name = "RoadLine",
+			Size = Vector3.new(0.6, 1.25, 500),
+			Position = Vector3.new(x, 1.15, 0),
+			Color = Color3.fromRGB(225, 185, 35),
+			Material = Enum.Material.SmoothPlastic,
+		}, town)
+	end
+
+	-- Concrete Sidewalks & Curbs
+	for _, side in { -1, 1 } do
+		makePart({
+			Name = "Sidewalk",
+			Size = Vector3.new(14, 1.4, 500),
+			Position = Vector3.new(side * 26, 1.2, 0),
+			Color = Color3.fromRGB(160, 160, 155),
+			Material = Enum.Material.Concrete,
+		}, town)
+		makePart({
+			Name = "Curb",
+			Size = Vector3.new(1.2, 1.8, 500),
+			Position = Vector3.new(side * 19.5, 1.3, 0),
+			Color = Color3.fromRGB(145, 145, 140),
+			Material = Enum.Material.Concrete,
+		}, town)
+	end
+
+	-- Pedestrian Crosswalks (white stripes across street matching reference image!)
+	for _, z in { 35, -35 } do
+		for x = -16, 16, 4 do
+			makePart({
+				Name = "CrosswalkStripe",
+				Size = Vector3.new(2.4, 0.05, 10),
+				Position = Vector3.new(x, 1.25, z),
+				Color = Color3.fromRGB(235, 235, 230),
+				Material = Enum.Material.SmoothPlastic,
+			}, town)
 		end
 	end
 
-	house.Parent = parent
-
-	-- Farmyard: fence with a gate gap facing the highway, silo, hay bales
-	local yard = Instance.new("Model")
-	yard.Name = "Farmyard"
-	buildFenceLine(Vector3.new(-112, 1, -70), Vector3.new(-32, 1, -70), yard)
-	buildFenceLine(Vector3.new(-112, 1, 30), Vector3.new(-32, 1, 30), yard)
-	buildFenceLine(Vector3.new(-112, 1, -70), Vector3.new(-112, 1, 30), yard)
-	buildFenceLine(Vector3.new(-32, 1, -70), Vector3.new(-32, 1, -30), yard)
-	buildFenceLine(Vector3.new(-32, 1, -10), Vector3.new(-32, 1, 30), yard)
-
+	-- Cross Street (Maple Street - Residential Avenue)
 	makePart({
-		Name = "Silo",
-		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(36, 14, 14),
-		CFrame = CFrame.new(-100, 19, 15) * CFrame.Angles(0, 0, math.rad(90)),
-		Color = Color3.fromRGB(165, 170, 175),
-		Material = Enum.Material.CorrodedMetal,
-	}, yard)
-	makePart({
-		Name = "SiloDome",
-		Shape = Enum.PartType.Ball,
-		Size = Vector3.new(14, 14, 14),
-		Position = Vector3.new(-100, 37, 15),
-		Color = Color3.fromRGB(120, 125, 130),
-		Material = Enum.Material.Metal,
-	}, yard)
-
-	local rng = Random.new(11)
-	for _, spot in { Vector2.new(-50, 18), Vector2.new(-55, 22), Vector2.new(-48, 24), Vector2.new(-95, -55), Vector2.new(-90, -60), Vector2.new(-100, -50) } do
-		destructible(makePart({
-			Name = "HayBale",
-			Shape = Enum.PartType.Cylinder,
-			Size = Vector3.new(4, 4.5, 4.5),
-			CFrame = CFrame.new(spot.X, 3.25, spot.Y) * CFrame.Angles(0, rng:NextNumber(0, math.pi), 0),
-			Color = Color3.fromRGB(196, 168, 96),
-			Material = Enum.Material.Fabric,
-		}, yard))
+		Name = "MapleStreetRoad",
+		Size = Vector3.new(380, 1.2, 32),
+		Position = Vector3.new(0, 1.12, -35),
+		Color = Color3.fromRGB(48, 50, 55),
+		Material = Enum.Material.SmoothPlastic,
+		Reflectance = 0.30,
+	}, town)
+	for _, side in { -1, 1 } do
+		makePart({
+			Name = "MapleSidewalk",
+			Size = Vector3.new(380, 1.4, 10),
+			Position = Vector3.new(0, 1.2, -35 + side * 21),
+			Color = Color3.fromRGB(160, 160, 155),
+			Material = Enum.Material.Concrete,
+		}, town)
 	end
 
-	-- Rural farmyard yard light pole
-	makePart({
-		Name = "FarmyardLightPole",
-		Size = Vector3.new(1.2, 24, 1.2),
-		Position = Vector3.new(-55, 12, -35),
-		Color = Color3.fromRGB(80, 58, 38),
-		Material = Enum.Material.Wood,
-	}, yard)
-	local lampHood = makePart({
-		Name = "FarmyardLampHood",
-		Size = Vector3.new(2.5, 0.8, 2.5),
-		Position = Vector3.new(-55, 23.5, -35),
-		Color = Color3.fromRGB(255, 245, 210),
-		Material = Enum.Material.Neon,
-	}, yard)
-	local farmLight = Instance.new("PointLight")
-	farmLight.Color = Color3.fromRGB(255, 240, 205)
-	farmLight.Brightness = 4.5
-	farmLight.Range = 65
-	farmLight.Shadows = true
-	farmLight.Parent = lampHood
+	-- Storefronts along Main Street
+	-- West Side: Ashwood Diner, Pharmacy & Sundries, Hardware & Feed
+	buildStorefront(Vector3.new(-48, 1, 80), 32, 28, 2, "ASHWOOD DINER", Color3.fromRGB(140, 35, 30), Color3.fromRGB(240, 235, 220), town)
+	buildStorefront(Vector3.new(-48, 1, 20), 30, 26, 2, "PHARMACY & SUNDRIES", Color3.fromRGB(35, 95, 55), Color3.fromRGB(230, 240, 235), town)
+	buildStorefront(Vector3.new(-48, 1, -95), 34, 28, 2, "HARDWARE & FEED", Color3.fromRGB(130, 75, 35), Color3.fromRGB(60, 60, 65), town)
 
-	yard.Parent = parent
+	-- East Side: Auto Repair, General Goods, Town Post Office
+	buildStorefront(Vector3.new(48, 1, 80), 32, 28, 2, "SILENT PEAKS AUTO", Color3.fromRGB(45, 50, 60), Color3.fromRGB(220, 140, 30), town)
+	buildStorefront(Vector3.new(48, 1, 20), 30, 26, 2, "GENERAL GOODS", Color3.fromRGB(120, 40, 40), Color3.fromRGB(240, 235, 215), town)
+	buildStorefront(Vector3.new(48, 1, -95), 34, 28, 2, "TOWN POST & TELEGRAPH", Color3.fromRGB(40, 70, 120), Color3.fromRGB(235, 235, 240), town)
+
+	-- 6 Detailed Abandoned Residential Houses along Maple Street
+	buildAbandonedHouse(Vector3.new(-85, 1, 15), 0, 1, town)   -- Blue Weatherboard
+	buildAbandonedHouse(Vector3.new(-145, 1, 15), 0, 2, town)  -- Peeling White Colonial
+	buildAbandonedHouse(Vector3.new(-85, 1, -85), 180, 3, town) -- Dark Craftsman Bungalow
+	buildAbandonedHouse(Vector3.new(85, 1, 15), 0, 4, town)    -- Derelict Brick Farmstead
+	buildAbandonedHouse(Vector3.new(145, 1, 15), 0, 5, town)   -- Storybook Cottage
+	buildAbandonedHouse(Vector3.new(85, 1, -85), 180, 6, town)  -- Dilapidated Victorian
+
+	-- Abandoned Vehicles matching the reference image!
+	-- 1980s wood-paneled station wagon parked along curb on the left
+	buildAbandonedCar(CFrame.new(-14, 1.2, 55) * CFrame.Angles(0, math.rad(-10), 0), "StationWagon", town)
+	-- Vintage sedan parked crookedly across the curb on the right
+	buildAbandonedCar(CFrame.new(15, 1.2, 12) * CFrame.Angles(0, math.rad(28), 0), "Sedan", town)
+	-- Rusted pickup truck abandoned near the intersection
+	buildAbandonedCar(CFrame.new(-13, 1.2, -65) * CFrame.Angles(0, math.rad(6), 0), "Pickup", town)
+	-- Abandoned sedan on Maple Street
+	buildAbandonedCar(CFrame.new(-115, 1.2, -35) * CFrame.Angles(0, math.rad(85), 0), "Sedan", town)
+
+	-- Vintage Cast-Iron Lampposts lining both sides of Main Street
+	for z = -180, 180, 45 do
+		for _, side in { -1, 1 } do
+			buildVintageLamppost(Vector3.new(side * 20, 1.3, z), town)
+		end
+	end
+
+	-- Vintage Lampposts along Maple Street
+	for _, x in { -160, -115, -70, 70, 115, 160 } do
+		buildVintageLamppost(Vector3.new(x, 1.3, -24), town)
+		buildVintageLamppost(Vector3.new(x, 1.3, -46), town)
+	end
+
+	-- Blue USPS Mailboxes
+	local function buildMailbox(pos: Vector3)
+		local box = Instance.new("Model")
+		box.Name = "USPSMailbox"
+		makePart({ Name = "Stand", Size = Vector3.new(1.8, 1.4, 1.6), Position = pos + Vector3.new(0, 0.7, 0), Color = Color3.fromRGB(40, 45, 50), Material = Enum.Material.Metal }, box)
+		makePart({ Name = "Body", Size = Vector3.new(2.4, 2.8, 2.2), Position = pos + Vector3.new(0, 2.6, 0), Color = Color3.fromRGB(35, 75, 150), Material = Enum.Material.Metal }, box)
+		makePart({ Name = "Cap", Shape = Enum.PartType.Cylinder, Size = Vector3.new(2.4, 2.2, 2.2), CFrame = CFrame.new(pos + Vector3.new(0, 4.0, 0)) * CFrame.Angles(0, 0, math.rad(90)), Color = Color3.fromRGB(35, 75, 150), Material = Enum.Material.Metal }, box)
+		box.Parent = town
+	end
+	buildMailbox(Vector3.new(21, 1.3, 30))
+	buildMailbox(Vector3.new(-21, 1.3, -30))
+
+	-- Fire Hydrants
+	local function buildFireHydrant(pos: Vector3)
+		local hyd = Instance.new("Model")
+		hyd.Name = "FireHydrant"
+		makePart({ Name = "Barrel", Shape = Enum.PartType.Cylinder, Size = Vector3.new(2.8, 1.4, 1.4), CFrame = CFrame.new(pos + Vector3.new(0, 1.4, 0)) * CFrame.Angles(0, 0, math.rad(90)), Color = Color3.fromRGB(195, 45, 40), Material = Enum.Material.Metal }, hyd)
+		makePart({ Name = "TopNut", Size = Vector3.new(1.4, 0.6, 1.4), Position = pos + Vector3.new(0, 3.1, 0), Color = Color3.fromRGB(225, 185, 30), Material = Enum.Material.Metal }, hyd)
+		hyd.Parent = town
+	end
+	buildFireHydrant(Vector3.new(-21, 1.3, 65))
+	buildFireHydrant(Vector3.new(21, 1.3, -70))
+
+	-- Overgrown curb weeds
+	local weedRng = Random.new(42)
+	for z = -180, 180, 20 do
+		for _, side in { -19.4, 19.4 } do
+			makePart({
+				Name = "CurbWeed",
+				Size = Vector3.new(1.4, 0.9, 1.4),
+				Position = Vector3.new(side + weedRng:NextNumber(-0.3, 0.3), 1.5, z + weedRng:NextNumber(-2, 2)),
+				Color = Color3.fromRGB(75, 105, 55),
+				Material = Enum.Material.Grass,
+			}, town)
+		end
+	end
+
+	-- Volumetric Ground-Hugging Fog Emitters along streets (matching the cinematic mist in screenshot)
+	for _, z in { -140, -70, 0, 70, 140 } do
+		buildGroundFogEmitter(Vector3.new(0, 2.5, z), Vector3.new(38, 3, 50), town)
+	end
+	for _, x in { -120, -60, 60, 120 } do
+		buildGroundFogEmitter(Vector3.new(x, 2.5, -35), Vector3.new(50, 3, 30), town)
+	end
+
+	town.Parent = parent
 end
 
 local function buildTree(position: Vector3, height: number, rng: Random, parent: Instance)
@@ -815,11 +1357,11 @@ local function initializeWorld()
 
 	buildHighway(worldFolder)
 	buildChaserSpawnBase(worldFolder)
-	buildFarm(worldFolder)
+	buildSilentHillTown(worldFolder)
 	buildScenery(worldFolder)
 	buildUndergroundStormBunker(worldFolder)
 
-	print("[FunnelRunnersWorld] Storm world with EF5 wedge tornado loaded.")
+	print("[FunnelRunnersWorld] Silent Hill abandoned foggy town with EF5 wedge loaded.")
 end
 
 initializeWorld()
