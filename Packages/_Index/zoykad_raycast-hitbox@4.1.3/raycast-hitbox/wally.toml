@@ -1,0 +1,6 @@
+[package]
+name = "zoykad/raycast-hitbox"
+description = "See https://wally.run/package/zoykad/raycasthitbox"
+version = "4.1.3"
+registry = "https://github.com/UpliftGames/wally-index"
+realm = "shared"

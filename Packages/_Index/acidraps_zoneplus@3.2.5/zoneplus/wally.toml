@@ -1,0 +1,15 @@
+[package]
+name = "acidraps/zoneplus"
+description = "Fork of 1foreverhd/zoneplus. Construct dynamic zones that utilise region checking, raycasting and the new BasePart.CanTouch property to effectively determine players and parts within their boundaries."
+license = "MIT"
+realm = "shared"
+registry = "https://github.com/UpliftGames/wally-index"
+version = "3.2.5"
+exclude = [
+	"docs", ".moonwave", "test",
+	"ZonePlus.rbxm", "ZonePlus.rbxmx",
+	".gitignore", "foreman.toml",
+	"default.project.json", "src/default.project.json",
+]
+
+[dependencies]
