@@ -50,6 +50,8 @@ local FunnelRunnersNetwork = {
 	LightningStrike = getRemote("LightningStrike"),
 	BunkerShelterState = getRemote("BunkerShelterState"),
 	SirenState = getRemote("SirenState"),
+	RoundStateChanged = getRemote("RoundStateChanged"),
+	StormAlert = getRemote("StormAlert"),
 }
 
 return FunnelRunnersNetwork

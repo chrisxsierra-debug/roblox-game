@@ -22,3 +22,4 @@ echo Successfully pushed your changes to GitHub!
 echo Your friend will receive your updates automatically!
 echo ========================================================
 pause
+

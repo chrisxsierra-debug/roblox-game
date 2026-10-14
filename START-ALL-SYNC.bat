@@ -26,3 +26,4 @@ echo Whenever your friend pushes to GitHub, your Studio
 echo will update automatically within 10 seconds!
 echo ========================================================
 timeout /t 5
+
