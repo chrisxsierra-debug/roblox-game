@@ -50,69 +50,74 @@ local function removeTemplateParts()
 end
 
 local function setupStormLighting()
-	-- High-visibility daylight supercell storm lighting: bright, cinematic, high contrast
-	Lighting.ClockTime = 14.2
-	Lighting.Brightness = 2.8
-	Lighting.Ambient = Color3.fromRGB(128, 138, 150)
-	Lighting.OutdoorAmbient = Color3.fromRGB(160, 172, 185)
-	Lighting.ExposureCompensation = 0.35
+	-- High-visibility daylight supercell storm lighting: bright, sunny, crystal clear
+	Lighting.ClockTime = 13.8
+	Lighting.Brightness = 3.8
+	Lighting.Ambient = Color3.fromRGB(195, 205, 215)
+	Lighting.OutdoorAmbient = Color3.fromRGB(218, 228, 238)
+	Lighting.ExposureCompensation = 0.85
 	Lighting.EnvironmentDiffuseScale = 1.0
 	Lighting.EnvironmentSpecularScale = 0.8
 	Lighting.GlobalShadows = true
-	Lighting.ShadowSoftness = 0.6
+	Lighting.ShadowSoftness = 0.75
 
-	for _, child in Lighting:GetChildren() do
-		if child:IsA("PostProcessEffect") or child:IsA("Atmosphere") then
-			child:Destroy()
-		end
-	end
-
-	-- Sun disk hidden behind clouds but high solar light bounces across the scene
 	local sky = Lighting:FindFirstChildOfClass("Sky")
-	if sky then
-		sky.CelestialBodiesShown = false
-		sky.StarCount = 0
+	if not sky then
+		sky = Instance.new("Sky")
+		sky.Parent = Lighting
 	end
+	sky.CelestialBodiesShown = true
+	sky.SunAngularSize = 21
 
-	local atmosphere = Instance.new("Atmosphere")
-	atmosphere.Density = 0.18
+	local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
+	if not atmosphere then
+		atmosphere = Instance.new("Atmosphere")
+		atmosphere.Name = "StormAtmosphere"
+		atmosphere.Parent = Lighting
+	end
+	atmosphere.Density = 0.06
 	atmosphere.Offset = 0.25
-	atmosphere.Color = Color3.fromRGB(165, 180, 195)
-	atmosphere.Decay = Color3.fromRGB(120, 140, 135)
-	atmosphere.Glare = 0.15
-	atmosphere.Haze = 0.8
-	atmosphere.Parent = Lighting
+	atmosphere.Color = Color3.fromRGB(195, 215, 235)
+	atmosphere.Decay = Color3.fromRGB(165, 185, 205)
+	atmosphere.Glare = 0.2
+	atmosphere.Haze = 0.1
 
-	local colorCorrection = Instance.new("ColorCorrectionEffect")
-	colorCorrection.Name = "StormColorCorrection"
-	colorCorrection.Brightness = 0.04
-	colorCorrection.Contrast = 0.12
-	colorCorrection.Saturation = 0.08
-	colorCorrection.TintColor = Color3.fromRGB(248, 252, 255)
-	colorCorrection.Parent = Lighting
+	local colorCorrection = Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
+	if not colorCorrection then
+		colorCorrection = Instance.new("ColorCorrectionEffect")
+		colorCorrection.Name = "StormColorCorrection"
+		colorCorrection.Parent = Lighting
+	end
+	colorCorrection.Brightness = 0.10
+	colorCorrection.Contrast = 0.06
+	colorCorrection.Saturation = 0.12
+	colorCorrection.TintColor = Color3.fromRGB(255, 255, 255)
 
-	local bloom = Instance.new("BloomEffect")
-	bloom.Intensity = 0.25
-	bloom.Size = 20
-	bloom.Threshold = 1.1 -- only bright things like lightning bloom
-	bloom.Parent = Lighting
+	local bloom = Lighting:FindFirstChildOfClass("BloomEffect")
+	if not bloom then
+		bloom = Instance.new("BloomEffect")
+		bloom.Parent = Lighting
+	end
+	bloom.Intensity = 0.2
+	bloom.Size = 18
+	bloom.Threshold = 1.1
 
-	-- Moving daylight storm clouds with high sky transmission
+	-- Light, translucent clouds that do NOT cast dense dark shadows
 	local oldClouds = Terrain:FindFirstChildOfClass("Clouds")
 	if oldClouds then
 		oldClouds:Destroy()
 	end
 	local clouds = Instance.new("Clouds")
-	clouds.Cover = 0.72
-	clouds.Density = 0.65
-	clouds.Color = Color3.fromRGB(160, 170, 185)
+	clouds.Cover = 0.35
+	clouds.Density = 0.25
+	clouds.Color = Color3.fromRGB(240, 245, 255)
 	clouds.Parent = Terrain
 end
 
 local function buildTerrain()
-	Terrain:SetMaterialColor(Enum.Material.Grass, Color3.fromRGB(92, 112, 64))
-	Terrain:SetMaterialColor(Enum.Material.Ground, Color3.fromRGB(102, 86, 64))
-	Terrain:SetMaterialColor(Enum.Material.Mud, Color3.fromRGB(70, 58, 45))
+	Terrain:SetMaterialColor(Enum.Material.Grass, Color3.fromRGB(135, 175, 85))
+	Terrain:SetMaterialColor(Enum.Material.Ground, Color3.fromRGB(175, 155, 120))
+	Terrain:SetMaterialColor(Enum.Material.Mud, Color3.fromRGB(115, 95, 75))
 
 	-- Flat prairie with its surface at y = 1 (same height as the old ground part).
 	-- It stops at y = -11, above the underground bunker at y = -31..-13.

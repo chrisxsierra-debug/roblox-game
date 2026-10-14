@@ -56,24 +56,44 @@
     "Lighting": {
       "$properties": {
         "Ambient": [
-          0.5,
-          0.54,
-          0.59
+          0.76,
+          0.80,
+          0.84
         ],
         "OutdoorAmbient": [
-          0.63,
-          0.67,
-          0.73
+          0.85,
+          0.89,
+          0.93
         ],
-        "Brightness": 2.8,
-        "ClockTime": 14.2,
-        "ExposureCompensation": 0.35,
+        "Brightness": 3.8,
+        "ClockTime": 13.8,
+        "ExposureCompensation": 0.85,
         "EnvironmentDiffuseScale": 1.0,
         "EnvironmentSpecularScale": 0.8,
         "GlobalShadows": true,
         "Outlines": false,
-        "ShadowSoftness": 0.6,
+        "ShadowSoftness": 0.75,
         "Technology": "Future"
+      },
+      "StormAtmosphere": {
+        "$className": "Atmosphere",
+        "$properties": {
+          "Density": 0.06,
+          "Offset": 0.25,
+          "Color": [ 0.76, 0.84, 0.92 ],
+          "Decay": [ 0.65, 0.72, 0.80 ],
+          "Glare": 0.2,
+          "Haze": 0.1
+        }
+      },
+      "StormColorCorrection": {
+        "$className": "ColorCorrectionEffect",
+        "$properties": {
+          "Brightness": 0.10,
+          "Contrast": 0.06,
+          "Saturation": 0.12,
+          "TintColor": [ 1.0, 1.0, 1.0 ]
+        }
       }
     },
     "SoundService": {

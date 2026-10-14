@@ -15,111 +15,118 @@ local player = Players.LocalPlayer
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Network = require(Shared:WaitForChild("FunnelRunnersNetwork"))
 
--- Create or fetch post-processing effects
-local colorCorrection = Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
-if not colorCorrection then
-	colorCorrection = Instance.new("ColorCorrectionEffect")
-	colorCorrection.Name = "StormColorCorrection"
-	colorCorrection.Parent = Lighting
+-- Helper getters to ensure we always target active instances in Lighting
+local function getColorCorrection(): ColorCorrectionEffect
+	local cc = Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
+	if not cc then
+		cc = Instance.new("ColorCorrectionEffect")
+		cc.Name = "StormColorCorrection"
+		cc.Parent = Lighting
+	end
+	return cc
 end
 
-local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
-if not atmosphere then
-	atmosphere = Instance.new("Atmosphere")
-	atmosphere.Name = "StormAtmosphere"
-	atmosphere.Parent = Lighting
+local function getAtmosphere(): Atmosphere
+	local at = Lighting:FindFirstChildOfClass("Atmosphere")
+	if not at then
+		at = Instance.new("Atmosphere")
+		at.Name = "StormAtmosphere"
+		at.Parent = Lighting
+	end
+	return at
 end
 
--- Preset configurations: high-visibility daylight supercell atmosphere
+-- Preset configurations: bright, open daylight supercell atmosphere
 local PRESETS = {
 	FairWeather = {
-		Ambient = Color3.fromRGB(128, 138, 150),
-		OutdoorAmbient = Color3.fromRGB(160, 172, 185),
-		Brightness = 2.8,
-		ExposureCompensation = 0.35,
-		FogEnd = 700,
-		FogColor = Color3.fromRGB(175, 190, 205),
+		Ambient = Color3.fromRGB(195, 205, 215),
+		OutdoorAmbient = Color3.fromRGB(220, 230, 240),
+		Brightness = 3.8,
+		ExposureCompensation = 0.85,
+		FogEnd = 1200,
+		FogColor = Color3.fromRGB(210, 225, 240),
 		ColorCorrection = {
-			Brightness = 0.04,
-			Contrast = 0.10,
-			Saturation = 0.08,
-			TintColor = Color3.fromRGB(252, 252, 255),
+			Brightness = 0.10,
+			Contrast = 0.06,
+			Saturation = 0.12,
+			TintColor = Color3.fromRGB(255, 255, 255),
 		},
 		Atmosphere = {
-			Density = 0.14,
+			Density = 0.06,
 			Offset = 0.25,
-			Color = Color3.fromRGB(170, 185, 205),
-			Decay = Color3.fromRGB(135, 150, 165),
-			Glare = 0.15,
-			Haze = 0.6,
+			Color = Color3.fromRGB(195, 215, 235),
+			Decay = Color3.fromRGB(165, 185, 205),
+			Glare = 0.2,
+			Haze = 0.1,
 		},
 	},
 
 	Approaching = {
-		Ambient = Color3.fromRGB(118, 130, 142),
-		OutdoorAmbient = Color3.fromRGB(150, 162, 172),
-		Brightness = 2.5,
-		ExposureCompensation = 0.30,
-		FogEnd = 450,
-		FogColor = Color3.fromRGB(145, 165, 155), -- Eerie green hail core tint
+		Ambient = Color3.fromRGB(185, 198, 208),
+		OutdoorAmbient = Color3.fromRGB(210, 222, 232),
+		Brightness = 3.5,
+		ExposureCompensation = 0.80,
+		FogEnd = 900,
+		FogColor = Color3.fromRGB(180, 205, 195), -- Subtle green-tinted supercell sky
 		ColorCorrection = {
-			Brightness = 0.03,
-			Contrast = 0.16,
-			Saturation = 0.04,
-			TintColor = Color3.fromRGB(240, 252, 242),
+			Brightness = 0.09,
+			Contrast = 0.08,
+			Saturation = 0.10,
+			TintColor = Color3.fromRGB(248, 255, 250),
 		},
 		Atmosphere = {
-			Density = 0.20,
+			Density = 0.10,
 			Offset = 0.20,
-			Color = Color3.fromRGB(145, 165, 155),
-			Decay = Color3.fromRGB(115, 135, 125),
-			Glare = 0.05,
-			Haze = 1.0,
+			Color = Color3.fromRGB(175, 200, 190),
+			Decay = Color3.fromRGB(150, 175, 165),
+			Glare = 0.1,
+			Haze = 0.2,
 		},
 	},
 
 	Warning = {
-		Ambient = Color3.fromRGB(108, 120, 132),
-		OutdoorAmbient = Color3.fromRGB(140, 152, 162),
-		Brightness = 2.2,
-		ExposureCompensation = 0.28,
-		FogEnd = 320,
-		FogColor = Color3.fromRGB(125, 145, 135),
+		Ambient = Color3.fromRGB(175, 188, 198),
+		OutdoorAmbient = Color3.fromRGB(200, 212, 222),
+		Brightness = 3.2,
+		ExposureCompensation = 0.75,
+		FogEnd = 700,
+		FogColor = Color3.fromRGB(160, 185, 175),
 		ColorCorrection = {
-			Brightness = 0.02,
-			Contrast = 0.20,
-			Saturation = -0.02,
-			TintColor = Color3.fromRGB(230, 246, 235),
+			Brightness = 0.08,
+			Contrast = 0.10,
+			Saturation = 0.08,
+			TintColor = Color3.fromRGB(242, 252, 245),
 		},
 		Atmosphere = {
-			Density = 0.26,
+			Density = 0.14,
 			Offset = 0.15,
-			Color = Color3.fromRGB(125, 145, 135),
-			Decay = Color3.fromRGB(100, 120, 110),
-			Glare = 0,
-			Haze = 1.4,
+			Color = Color3.fromRGB(155, 180, 170),
+			Decay = Color3.fromRGB(135, 160, 150),
+			Glare = 0.05,
+			Haze = 0.3,
 		},
 	},
 
 	CoreImpact = {
-		Ambient = Color3.fromRGB(98, 112, 124),
-		OutdoorAmbient = Color3.fromRGB(130, 144, 154),
-		Brightness = 2.0, -- Always bright and visible!
-		FogEnd = 240,    -- Clear visibility of the wedge funnel and terrain!
-		FogColor = Color3.fromRGB(110, 128, 120),
+		Ambient = Color3.fromRGB(165, 178, 188),
+		OutdoorAmbient = Color3.fromRGB(190, 202, 212),
+		Brightness = 3.0, -- Always bright and visible!
+		ExposureCompensation = 0.70,
+		FogEnd = 500,    -- 500 studs visibility! Player can see far ahead!
+		FogColor = Color3.fromRGB(145, 170, 160),
 		ColorCorrection = {
-			Brightness = 0.02,
-			Contrast = 0.24,
-			Saturation = -0.06,
-			TintColor = Color3.fromRGB(220, 238, 228),
+			Brightness = 0.07,
+			Contrast = 0.12,
+			Saturation = 0.05,
+			TintColor = Color3.fromRGB(235, 248, 240),
 		},
 		Atmosphere = {
-			Density = 0.32,
+			Density = 0.18,
 			Offset = 0.10,
-			Color = Color3.fromRGB(110, 130, 120),
-			Decay = Color3.fromRGB(85, 105, 95),
+			Color = Color3.fromRGB(140, 165, 155),
+			Decay = Color3.fromRGB(120, 145, 135),
 			Glare = 0,
-			Haze = 1.8,
+			Haze = 0.4,
 		},
 	},
 }
@@ -133,6 +140,9 @@ local function applyPreset(name: string, duration: number)
 	local p = PRESETS[name]
 	if not p then return end
 
+	local cc = getColorCorrection()
+	local at = getAtmosphere()
+
 	local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
 
 	local t1 = TweenService:Create(Lighting, tweenInfo, {
@@ -145,7 +155,7 @@ local function applyPreset(name: string, duration: number)
 	})
 	t1:Play()
 
-	local t2 = TweenService:Create(colorCorrection, tweenInfo, {
+	local t2 = TweenService:Create(cc, tweenInfo, {
 		Brightness = p.ColorCorrection.Brightness,
 		Contrast = p.ColorCorrection.Contrast,
 		Saturation = p.ColorCorrection.Saturation,
@@ -153,7 +163,7 @@ local function applyPreset(name: string, duration: number)
 	})
 	t2:Play()
 
-	local t3 = TweenService:Create(atmosphere, tweenInfo, {
+	local t3 = TweenService:Create(at, tweenInfo, {
 		Density = p.Atmosphere.Density,
 		Offset = p.Atmosphere.Offset,
 		Color = p.Atmosphere.Color,
@@ -195,13 +205,14 @@ end)
 
 -- Lightning Flash Effect
 Network.LightningStrike.OnClientEvent:Connect(function(_strikePos)
+	local cc = getColorCorrection()
 	-- Instant flash
-	colorCorrection.Brightness = 0.6
-	colorCorrection.Contrast = 0.6
-	Lighting.Brightness = 8
+	cc.Brightness = 0.7
+	cc.Contrast = 0.5
+	Lighting.Brightness = 10
 
 	-- Rapid fade back
-	TweenService:Create(colorCorrection, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+	TweenService:Create(cc, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 		Brightness = PRESETS[currentPreset].ColorCorrection.Brightness,
 		Contrast = PRESETS[currentPreset].ColorCorrection.Contrast,
 	}):Play()
