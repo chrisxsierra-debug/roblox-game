@@ -50,15 +50,16 @@ local function removeTemplateParts()
 end
 
 local function setupStormLighting()
-	-- Overcast late-afternoon storm: moody, but still bright enough to see the tornado
-	Lighting.ClockTime = 16.5
-	Lighting.Brightness = 1.6
-	Lighting.Ambient = Color3.fromRGB(70, 75, 85)
-	Lighting.OutdoorAmbient = Color3.fromRGB(105, 110, 120)
-	Lighting.EnvironmentDiffuseScale = 0.6
-	Lighting.EnvironmentSpecularScale = 0.4
+	-- High-visibility daylight supercell storm lighting: bright, cinematic, high contrast
+	Lighting.ClockTime = 14.2
+	Lighting.Brightness = 2.8
+	Lighting.Ambient = Color3.fromRGB(128, 138, 150)
+	Lighting.OutdoorAmbient = Color3.fromRGB(160, 172, 185)
+	Lighting.ExposureCompensation = 0.35
+	Lighting.EnvironmentDiffuseScale = 1.0
+	Lighting.EnvironmentSpecularScale = 0.8
 	Lighting.GlobalShadows = true
-	Lighting.ShadowSoftness = 0.5
+	Lighting.ShadowSoftness = 0.6
 
 	for _, child in Lighting:GetChildren() do
 		if child:IsA("PostProcessEffect") or child:IsA("Atmosphere") then
@@ -66,7 +67,7 @@ local function setupStormLighting()
 		end
 	end
 
-	-- Hide the bright sun disc behind the storm clouds
+	-- Sun disk hidden behind clouds but high solar light bounces across the scene
 	local sky = Lighting:FindFirstChildOfClass("Sky")
 	if sky then
 		sky.CelestialBodiesShown = false
@@ -74,35 +75,37 @@ local function setupStormLighting()
 	end
 
 	local atmosphere = Instance.new("Atmosphere")
-	atmosphere.Density = 0.42
-	atmosphere.Offset = 0.15
-	atmosphere.Color = Color3.fromRGB(115, 122, 130)
-	atmosphere.Decay = Color3.fromRGB(70, 76, 84)
-	atmosphere.Glare = 0
-	atmosphere.Haze = 2.2
+	atmosphere.Density = 0.18
+	atmosphere.Offset = 0.25
+	atmosphere.Color = Color3.fromRGB(165, 180, 195)
+	atmosphere.Decay = Color3.fromRGB(120, 140, 135)
+	atmosphere.Glare = 0.15
+	atmosphere.Haze = 0.8
 	atmosphere.Parent = Lighting
 
 	local colorCorrection = Instance.new("ColorCorrectionEffect")
+	colorCorrection.Name = "StormColorCorrection"
+	colorCorrection.Brightness = 0.04
 	colorCorrection.Contrast = 0.12
-	colorCorrection.Saturation = -0.25
-	colorCorrection.TintColor = Color3.fromRGB(220, 230, 240)
+	colorCorrection.Saturation = 0.08
+	colorCorrection.TintColor = Color3.fromRGB(248, 252, 255)
 	colorCorrection.Parent = Lighting
 
 	local bloom = Instance.new("BloomEffect")
 	bloom.Intensity = 0.25
 	bloom.Size = 20
-	bloom.Threshold = 1.2 -- only bright things like lightning bloom
+	bloom.Threshold = 1.1 -- only bright things like lightning bloom
 	bloom.Parent = Lighting
 
-	-- Thick, moving storm clouds
+	-- Moving daylight storm clouds with high sky transmission
 	local oldClouds = Terrain:FindFirstChildOfClass("Clouds")
 	if oldClouds then
 		oldClouds:Destroy()
 	end
 	local clouds = Instance.new("Clouds")
-	clouds.Cover = 0.85
-	clouds.Density = 0.8
-	clouds.Color = Color3.fromRGB(85, 90, 100)
+	clouds.Cover = 0.72
+	clouds.Density = 0.65
+	clouds.Color = Color3.fromRGB(160, 170, 185)
 	clouds.Parent = Terrain
 end
 
@@ -224,6 +227,31 @@ local function buildHighway(parent: Instance)
 				wire.Parent = crossArm
 			end
 		end
+		-- Highway Streetlight extending over roadway
+		makePart({
+			Name = "StreetlightArm",
+			Size = Vector3.new(12, 0.5, 0.5),
+			Position = Vector3.new(19, 29.5, z),
+			Color = Color3.fromRGB(130, 135, 140),
+			Material = Enum.Material.Metal,
+		}, parent)
+		local lampHead = makePart({
+			Name = "StreetlightLamp",
+			Size = Vector3.new(3, 0.6, 1.4),
+			Position = Vector3.new(13, 29, z),
+			Color = Color3.fromRGB(255, 250, 230),
+			Material = Enum.Material.Neon,
+		}, parent)
+		local streetSpot = Instance.new("SpotLight")
+		streetSpot.Name = "StreetSpot"
+		streetSpot.Face = Enum.NormalId.Bottom
+		streetSpot.Brightness = 4.5
+		streetSpot.Range = 50
+		streetSpot.Angle = 80
+		streetSpot.Color = Color3.fromRGB(255, 248, 225)
+		streetSpot.Shadows = true
+		streetSpot.Parent = lampHead
+
 		previousEnds = ends
 	end
 
@@ -302,6 +330,21 @@ local function buildChaserSpawnBase(parent: Instance)
 	makePart({ Name = "Steps", Size = Vector3.new(3, 1, 4.5), Position = p + Vector3.new(15.6, -5.5, -3), Color = Color3.fromRGB(120, 120, 125), Material = Enum.Material.DiamondPlate }, base)
 	makePart({ Name = "ACUnit", Size = Vector3.new(5, 2, 4), Position = p + Vector3.new(6, 7, 0), Color = Color3.fromRGB(205, 205, 210), Material = Enum.Material.Metal }, base)
 
+	-- Research HQ trailer entrance porch light
+	local porchLightPart = makePart({
+		Name = "TrailerPorchLight",
+		Size = Vector3.new(1.2, 1.2, 0.6),
+		Position = p + Vector3.new(14.2, 2.5, -3),
+		Color = Color3.fromRGB(255, 245, 210),
+		Material = Enum.Material.Neon,
+	}, base)
+	local porchLight = Instance.new("PointLight")
+	porchLight.Brightness = 3
+	porchLight.Range = 25
+	porchLight.Color = Color3.fromRGB(255, 240, 200)
+	porchLight.Shadows = true
+	porchLight.Parent = porchLightPart
+
 	-- Spinning Doppler radar dish
 	local dishMast = makePart({
 		Name = "DishMast",
@@ -310,6 +353,21 @@ local function buildChaserSpawnBase(parent: Instance)
 		Color = Color3.fromRGB(100, 100, 105),
 		Material = Enum.Material.Metal,
 	}, base)
+
+	-- Red aviation warning beacon on the radar mast
+	local redBeacon = makePart({
+		Name = "RadarWarningBeacon",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(1.2, 1.4, 1.4),
+		CFrame = CFrame.new(dishMast.Position + Vector3.new(0, 11, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = Color3.fromRGB(255, 40, 40),
+		Material = Enum.Material.Neon,
+	}, base)
+	local beaconLight = Instance.new("PointLight")
+	beaconLight.Color = Color3.fromRGB(255, 40, 40)
+	beaconLight.Brightness = 4
+	beaconLight.Range = 35
+	beaconLight.Parent = redBeacon
 
 	local dish = makePart({
 		Name = "DopplerDish",
@@ -326,6 +384,44 @@ local function buildChaserSpawnBase(parent: Instance)
 			task.wait(0.03)
 		end
 	end)
+
+	-- Dual Depot Stadium Floodlight Towers illuminating spawn and vehicle bays
+	for _, towerPos in { Vector3.new(16, 0, 105), Vector3.new(-16, 0, 138) } do
+		makePart({
+			Name = "FloodlightTower",
+			Size = Vector3.new(1.6, 26, 1.6),
+			Position = towerPos + Vector3.new(0, 13, 0),
+			Color = Color3.fromRGB(75, 80, 85),
+			Material = Enum.Material.Metal,
+		}, base)
+
+		makePart({
+			Name = "FloodlightCrossBar",
+			Size = Vector3.new(6, 0.8, 0.8),
+			Position = towerPos + Vector3.new(0, 25.5, 0),
+			Color = Color3.fromRGB(60, 65, 70),
+			Material = Enum.Material.Metal,
+		}, base)
+
+		for _, dx in { -2.2, 2.2 } do
+			local lamp = makePart({
+				Name = "FloodLamp",
+				Size = Vector3.new(1.8, 1.2, 1.6),
+				CFrame = CFrame.new(towerPos + Vector3.new(dx, 25, 0)) * CFrame.Angles(math.rad(-25), 0, 0),
+				Color = Color3.fromRGB(255, 250, 235),
+				Material = Enum.Material.Neon,
+			}, base)
+
+			local spot = Instance.new("SpotLight")
+			spot.Face = Enum.NormalId.Front
+			spot.Brightness = 6.5
+			spot.Range = 90
+			spot.Angle = 80
+			spot.Color = Color3.fromRGB(255, 245, 220)
+			spot.Shadows = true
+			spot.Parent = lamp
+		end
+	end
 
 	base.Parent = parent
 end
@@ -482,6 +578,28 @@ local function buildFarm(parent: Instance)
 		}, yard))
 	end
 
+	-- Rural farmyard yard light pole
+	makePart({
+		Name = "FarmyardLightPole",
+		Size = Vector3.new(1.2, 24, 1.2),
+		Position = Vector3.new(-55, 12, -35),
+		Color = Color3.fromRGB(80, 58, 38),
+		Material = Enum.Material.Wood,
+	}, yard)
+	local lampHood = makePart({
+		Name = "FarmyardLampHood",
+		Size = Vector3.new(2.5, 0.8, 2.5),
+		Position = Vector3.new(-55, 23.5, -35),
+		Color = Color3.fromRGB(255, 245, 210),
+		Material = Enum.Material.Neon,
+	}, yard)
+	local farmLight = Instance.new("PointLight")
+	farmLight.Color = Color3.fromRGB(255, 240, 205)
+	farmLight.Brightness = 4.5
+	farmLight.Range = 65
+	farmLight.Shadows = true
+	farmLight.Parent = lampHood
+
 	yard.Parent = parent
 end
 
@@ -543,6 +661,28 @@ local function buildUndergroundStormBunker(parent: Instance)
 		Color = Color3.fromRGB(90, 85, 80),
 		Material = Enum.Material.Concrete,
 	}, bunker)
+
+	-- Surface caution floodlights at the collar corners
+	for _, corner in {
+		Vector3.new(-11, 3.5, -11),
+		Vector3.new(11, 3.5, -11),
+		Vector3.new(-11, 3.5, 11),
+		Vector3.new(11, 3.5, 11),
+	} do
+		local lightPost = makePart({
+			Name = "BunkerCautionLight",
+			Size = Vector3.new(0.8, 2, 0.8),
+			Position = bunkerPos + corner,
+			Color = Color3.fromRGB(255, 180, 20),
+			Material = Enum.Material.Neon,
+		}, bunker)
+		local pLight = Instance.new("PointLight")
+		pLight.Color = Color3.fromRGB(255, 190, 30)
+		pLight.Brightness = 4.5
+		pLight.Range = 35
+		pLight.Shadows = true
+		pLight.Parent = lightPost
+	end
 
 	local hatch = makePart({
 		Name = "BlastHatch",

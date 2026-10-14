@@ -10,6 +10,7 @@ local SoundService = game:GetService("SoundService")
 local player = Players.LocalPlayer
 local flashlightOn = false
 local currentSpotlight: SpotLight? = nil
+local currentFillLight: PointLight? = nil
 
 local function toggleFlashlight()
 	local char = player.Character
@@ -30,18 +31,30 @@ local function toggleFlashlight()
 	if flashlightOn then
 		local light = Instance.new("SpotLight")
 		light.Name = "ChaserFlashlightBeam"
-		light.Brightness = 8
-		light.Range = 90
-		light.Angle = 65
-		light.Color = Color3.fromRGB(245, 248, 255)
+		light.Brightness = 10
+		light.Range = 140
+		light.Angle = 70
+		light.Color = Color3.fromRGB(255, 252, 240)
 		light.Face = Enum.NormalId.Front
 		light.Shadows = true
 		light.Parent = root
 		currentSpotlight = light
+
+		local fill = Instance.new("PointLight")
+		fill.Name = "ChaserFlashlightFill"
+		fill.Brightness = 1.2
+		fill.Range = 20
+		fill.Color = Color3.fromRGB(255, 250, 235)
+		fill.Parent = root
+		currentFillLight = fill
 	else
 		if currentSpotlight then
 			currentSpotlight:Destroy()
 			currentSpotlight = nil
+		end
+		if currentFillLight then
+			currentFillLight:Destroy()
+			currentFillLight = nil
 		end
 	end
 end

@@ -65,13 +65,13 @@ function TornadoBuilder.Build(name: string, shape: Shape, groundPosition: Vector
 	model.PrimaryPart = root
 	CollectionService:AddTag(root, "TornadoVortex")
 
-	local function attachVisual(part: BasePart)
+	local function attachVisual(part: BasePart, castShadow: boolean?)
 		part.Anchored = false
 		part.CanCollide = false
 		part.CanTouch = false
 		part.CanQuery = false
 		part.Massless = true
-		part.CastShadow = true
+		part.CastShadow = castShadow or false
 		part.Material = Enum.Material.SmoothPlastic
 		local weld = Instance.new("WeldConstraint")
 		weld.Part0 = root

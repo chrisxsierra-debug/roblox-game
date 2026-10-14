@@ -56,13 +56,23 @@
     "Lighting": {
       "$properties": {
         "Ambient": [
-          0,
-          0,
-          0
+          0.5,
+          0.54,
+          0.59
         ],
-        "Brightness": 2,
+        "OutdoorAmbient": [
+          0.63,
+          0.67,
+          0.73
+        ],
+        "Brightness": 2.8,
+        "ClockTime": 14.2,
+        "ExposureCompensation": 0.35,
+        "EnvironmentDiffuseScale": 1.0,
+        "EnvironmentSpecularScale": 0.8,
         "GlobalShadows": true,
         "Outlines": false,
+        "ShadowSoftness": 0.6,
         "Technology": "Future"
       }
     },

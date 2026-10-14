@@ -91,10 +91,10 @@ local function buildDrivableChaserTruck(spawnCFrame: CFrame): Model
 		lightPart.Parent = truck
 
 		local spot = Instance.new("SpotLight")
-		spot.Brightness = 8
-		spot.Range = 160
-		spot.Angle = 60
-		spot.Color = Color3.fromRGB(255, 255, 230)
+		spot.Brightness = 10
+		spot.Range = 190
+		spot.Angle = 65
+		spot.Color = Color3.fromRGB(255, 255, 235)
 		spot.Face = Enum.NormalId.Front
 		spot.Shadows = true
 		spot.Parent = lightPart
@@ -123,8 +123,19 @@ local function buildDrivableChaserTruck(spawnCFrame: CFrame): Model
 	local beacon = Instance.new("PointLight")
 	beacon.Color = Color3.fromRGB(255, 160, 20)
 	beacon.Brightness = 5
-	beacon.Range = 35
+	beacon.Range = 40
 	beacon.Parent = lightbar
+
+	-- Forward High-Output Roof LED Searchlight Beam
+	local roofFlood = Instance.new("SpotLight")
+	roofFlood.Name = "RoofSearchlight"
+	roofFlood.Brightness = 12
+	roofFlood.Range = 220
+	roofFlood.Angle = 75
+	roofFlood.Color = Color3.fromRGB(240, 248, 255)
+	roofFlood.Face = Enum.NormalId.Front
+	roofFlood.Shadows = true
+	roofFlood.Parent = lightbar
 
 	-- Engine Audio Loop
 	local engineSound = Instance.new("Sound")
