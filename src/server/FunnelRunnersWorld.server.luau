@@ -53,16 +53,16 @@ local function setupStormLighting()
 	-- Silent Hill atmospheric daylight fog: luminous, pearlescent silver-white mist
 	Lighting.ClockTime = 14.0
 	Lighting.Brightness = 3.2
-	Lighting.Ambient = Color3.fromRGB(180, 185, 195)
-	Lighting.OutdoorAmbient = Color3.fromRGB(205, 212, 222)
+	Lighting.Ambient = Color3.fromRGB(184, 192, 200)
+	Lighting.OutdoorAmbient = Color3.fromRGB(210, 218, 228)
 	Lighting.ExposureCompensation = 0.65
 	Lighting.EnvironmentDiffuseScale = 1.0
 	Lighting.EnvironmentSpecularScale = 0.85
 	Lighting.GlobalShadows = true
 	Lighting.ShadowSoftness = 0.8
-	Lighting.FogColor = Color3.fromRGB(212, 218, 225)
-	Lighting.FogStart = 20
-	Lighting.FogEnd = 200
+	Lighting.FogColor = Color3.fromRGB(218, 224, 232)
+	Lighting.FogStart = 40
+	Lighting.FogEnd = 350
 
 	local sky = Lighting:FindFirstChildOfClass("Sky")
 	if not sky then
@@ -78,12 +78,12 @@ local function setupStormLighting()
 		atmosphere.Name = "StormAtmosphere"
 		atmosphere.Parent = Lighting
 	end
-	atmosphere.Density = 0.44
-	atmosphere.Offset = 0.18
-	atmosphere.Color = Color3.fromRGB(215, 222, 230)
-	atmosphere.Decay = Color3.fromRGB(180, 190, 200)
-	atmosphere.Glare = 0.25
-	atmosphere.Haze = 0.35
+	atmosphere.Density = 0.38
+	atmosphere.Offset = 0.15
+	atmosphere.Color = Color3.fromRGB(218, 224, 232)
+	atmosphere.Decay = Color3.fromRGB(190, 200, 210)
+	atmosphere.Glare = 0.20
+	atmosphere.Haze = 0.25
 
 	local colorCorrection = Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
 	if not colorCorrection then
@@ -122,28 +122,23 @@ local function buildTerrain()
 	Terrain:SetMaterialColor(Enum.Material.Ground, Color3.fromRGB(175, 155, 120))
 	Terrain:SetMaterialColor(Enum.Material.Mud, Color3.fromRGB(115, 95, 75))
 
-	-- Flat prairie with its surface at y = 1 (same height as the old ground part).
-	-- It stops at y = -11, above the underground bunker at y = -31..-13.
-	Terrain:FillBlock(CFrame.new(0, -5, 0), Vector3.new(1200, 12, 1200), Enum.Material.Grass)
+	-- Flat prairie with its surface at y = 1 (same height as town road/sidewalk levels).
+	Terrain:FillBlock(CFrame.new(0, -5, 0), Vector3.new(1400, 12, 1400), Enum.Material.Grass)
 
 	-- Ring of rolling hills around the map edge
 	local rng = Random.new(7)
 	for i = 1, 28 do
 		local angle = (i / 28) * math.pi * 2 + rng:NextNumber(-0.1, 0.1)
-		local dist = rng:NextNumber(420, 520)
+		local dist = rng:NextNumber(440, 560)
 		local radius = rng:NextNumber(60, 110)
 		Terrain:FillBall(Vector3.new(math.cos(angle) * dist, -radius * 0.55, math.sin(angle) * dist), radius, Enum.Material.Grass)
 	end
 
-	-- Farm pond with a muddy bank
-	local pond = Vector3.new(130, 0, -70)
-	Terrain:FillCylinder(CFrame.new(pond + Vector3.new(0, -3, 0)), 8, 34, Enum.Material.Mud)
-	Terrain:FillCylinder(CFrame.new(pond + Vector3.new(0, -2, 0)), 8, 28, Enum.Material.Air)
-	Terrain:FillCylinder(CFrame.new(pond + Vector3.new(0, -3.5, 0)), 5, 28, Enum.Material.Water)
-
-	-- Dirt yard around the farmhouse
-	local yard = Region3.new(Vector3.new(-92, -4, -52), Vector3.new(-36, 4, 12)):ExpandToGrid(4)
-	Terrain:ReplaceMaterial(yard, 4, Enum.Material.Grass, Enum.Material.Ground)
+	-- Mist lake out in the hills northeast of the town perimeter
+	local pond = Vector3.new(340, 0, -260)
+	Terrain:FillCylinder(CFrame.new(pond + Vector3.new(0, -3, 0)), 8, 48, Enum.Material.Mud)
+	Terrain:FillCylinder(CFrame.new(pond + Vector3.new(0, -2, 0)), 8, 42, Enum.Material.Air)
+	Terrain:FillCylinder(CFrame.new(pond + Vector3.new(0, -3.5, 0)), 5, 42, Enum.Material.Water)
 end
 
 local function buildHighway(parent: Instance)
@@ -1345,6 +1340,149 @@ local function buildUndergroundStormBunker(parent: Instance)
 	bunker.Parent = parent
 end
 
+local function setupBakedTown(town: Instance, worldFolder: Instance)
+	-- 1. Tag all destructible house and storefront components for RankineVortexEngine tornadic destruction!
+	local taggedCount = 0
+	for _, desc in town:GetDescendants() do
+		if desc:IsA("BasePart") then
+			local name = desc.Name
+			local p = desc.Parent
+			local isHouseOrStore = p and (p.Name:find("AbandonedHouse_") ~= nil or p.Name:find("Storefront_") ~= nil)
+			if isHouseOrStore and name ~= "Foundation" and name ~= "MainBuilding" then
+				destructible(desc)
+				taggedCount += 1
+			end
+		end
+	end
+	print(string.format("[FunnelRunnersWorld] Tagged %d town architectural parts as DestructibleStructure for EF5 wedge!", taggedCount))
+
+	-- 2. Underground Shelter Chamber (at y = -30, beneath town square park)
+	local interiorPos = Vector3.new(24, -30, 0)
+	local shelter = Instance.new("Model")
+	shelter.Name = "UndergroundShelterChamber"
+
+	makePart({ Name = "ShelterFloor", Size = Vector3.new(48, 2, 48), Position = interiorPos, Color = Color3.fromRGB(65, 65, 70), Material = Enum.Material.Concrete }, shelter)
+	local ceiling = makePart({ Name = "ShelterCeiling", Size = Vector3.new(48, 2, 48), Position = interiorPos + Vector3.new(0, 16, 0), Color = Color3.fromRGB(55, 55, 60), Material = Enum.Material.Concrete }, shelter)
+	for _, wall in {
+		{ Offset = Vector3.new(0, 8, -24.5), Size = Vector3.new(48, 18, 1) },
+		{ Offset = Vector3.new(0, 8, 24.5), Size = Vector3.new(48, 18, 1) },
+		{ Offset = Vector3.new(-24.5, 8, 0), Size = Vector3.new(1, 18, 48) },
+		{ Offset = Vector3.new(24.5, 8, 0), Size = Vector3.new(1, 18, 48) },
+	} do
+		makePart({ Name = "ShelterWall", Size = wall.Size, Position = interiorPos + wall.Offset, Color = Color3.fromRGB(75, 75, 80), Material = Enum.Material.Concrete }, shelter)
+	end
+
+	local redLight = Instance.new("PointLight")
+	redLight.Color = Color3.fromRGB(255, 80, 60)
+	redLight.Brightness = 3.5
+	redLight.Range = 45
+	redLight.Parent = ceiling
+
+	for _, x in { -12, 12 } do
+		local lamp = makePart({ Name = "CeilingLamp", Size = Vector3.new(4, 0.6, 1.5), Position = interiorPos + Vector3.new(x, 14.7, 0), Color = Color3.fromRGB(255, 240, 215), Material = Enum.Material.Neon }, shelter)
+		local lampLight = Instance.new("PointLight")
+		lampLight.Color = Color3.fromRGB(255, 235, 200)
+		lampLight.Brightness = 1.5
+		lampLight.Range = 30
+		lampLight.Parent = lamp
+	end
+	for _, x in { -21, 21 } do
+		makePart({ Name = "Bench", Size = Vector3.new(3, 1, 30), Position = interiorPos + Vector3.new(x, 2.5, 0), Color = WOOD, Material = Enum.Material.Wood }, shelter)
+	end
+
+	local exitLadder = makePart({
+		Name = "ExitLadder",
+		Size = Vector3.new(5, 14, 1.2),
+		Position = interiorPos + Vector3.new(0, 7, 22),
+		Color = Color3.fromRGB(240, 200, 30),
+		Material = Enum.Material.DiamondPlate,
+	}, shelter)
+
+	local exitPrompt = Instance.new("ProximityPrompt")
+	exitPrompt.ObjectText = "Surface Hatch"
+	exitPrompt.ActionText = "Climb to Surface"
+	exitPrompt.HoldDuration = 0.3
+	exitPrompt.MaxActivationDistance = 14
+	exitPrompt.Parent = exitLadder
+
+	exitPrompt.Triggered:Connect(function(player)
+		local char = player.Character
+		if char then
+			local root = char:FindFirstChild("HumanoidRootPart") :: BasePart
+			if root then
+				root.CFrame = CFrame.new(24, 4, 18)
+			end
+		end
+	end)
+
+	local safeVolume = makePart({
+		Name = "BunkerSafeVolume",
+		Size = Vector3.new(46, 15, 46),
+		Position = interiorPos + Vector3.new(0, 8, 0),
+		Transparency = 1,
+		CanCollide = false,
+	}, shelter)
+	CollectionService:AddTag(safeVolume, "StormBunker")
+	shelter.Parent = worldFolder
+
+	-- Hook surface entrance teleport pad
+	local bunkerEntrance = town:FindFirstChild("UndergroundStormBunkerEntrance", true)
+	if bunkerEntrance then
+		local entrancePad = bunkerEntrance:FindFirstChild("EntrancePad", true) :: BasePart?
+		if entrancePad then
+			entrancePad.Touched:Connect(function(hit)
+				local char = hit.Parent
+				if char and char:IsA("Model") then
+					local root = char:FindFirstChild("HumanoidRootPart") :: BasePart
+					if root and root.Position.Y > 0 then
+						root.CFrame = CFrame.new(24, -26, 0)
+					end
+				end
+			end)
+		end
+	end
+
+	-- 3. Rotating Doppler Radar Dish on Research HQ Trailer
+	local trailer = town:FindFirstChild("ResearchHQTrailer", true)
+	if trailer then
+		local dishMast = trailer:FindFirstChild("DishMast") :: BasePart?
+		if dishMast then
+			local dish = makePart({
+				Name = "DopplerDish",
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new(2.5, 12, 12),
+				CFrame = CFrame.new(dishMast.Position + Vector3.new(0, 5, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+				Color = Color3.fromRGB(245, 245, 250),
+				Material = Enum.Material.SmoothPlastic,
+			}, trailer)
+
+			task.spawn(function()
+				while dish.Parent do
+					dish.CFrame = dish.CFrame * CFrame.Angles(0, math.rad(2.5), 0)
+					task.wait(0.03)
+				end
+			end)
+		end
+	end
+
+	-- 4. Perimeter Dense Forest Trees surrounding the town in the fog
+	local trees = Instance.new("Folder")
+	trees.Name = "PerimeterForest"
+	local rng = Random.new(77)
+	local placed = 0
+	while placed < 60 do
+		local x = rng:NextNumber(-460, 460)
+		local z = rng:NextNumber(-460, 460)
+		if math.abs(x) > 260 or math.abs(z) > 290 then
+			buildTree(Vector3.new(x, 1, z), rng:NextNumber(22, 35), rng, trees)
+			placed += 1
+		end
+	end
+	trees.Parent = worldFolder
+
+	print("[FunnelRunnersWorld] Silent Hill town fully hooked up: 44 houses, bunker, rotating radar dish, and perimeter pine forest.")
+end
+
 local function initializeWorld()
 	removeTemplateParts()
 	setupStormLighting()
@@ -1353,15 +1491,23 @@ local function initializeWorld()
 	local worldFolder = Workspace:FindFirstChild("FunnelRunnersWorld") or Instance.new("Folder")
 	worldFolder.Name = "FunnelRunnersWorld"
 	worldFolder.Parent = Workspace
-	worldFolder:ClearAllChildren()
 
-	buildHighway(worldFolder)
-	buildChaserSpawnBase(worldFolder)
-	buildSilentHillTown(worldFolder)
-	buildScenery(worldFolder)
-	buildUndergroundStormBunker(worldFolder)
+	local existingTown = Workspace:FindFirstChild("SilentHillTown")
+	if existingTown then
+		-- Baked town from Rojo is present! Hook up physics and interactions
+		setupBakedTown(existingTown, worldFolder)
+	else
+		-- Procedural fallback
+		worldFolder:ClearAllChildren()
+		buildHighway(worldFolder)
+		buildChaserSpawnBase(worldFolder)
+		buildSilentHillTown(worldFolder)
+		buildScenery(worldFolder)
+		buildUndergroundStormBunker(worldFolder)
+	end
 
 	print("[FunnelRunnersWorld] Silent Hill abandoned foggy town with EF5 wedge loaded.")
 end
 
 initializeWorld()
+

@@ -327,10 +327,10 @@ Network.TruckAnchorRequest.OnServerEvent:Connect(function(player: Player)
 	truck:SetAttribute("AnchoredSpikes", not currentlyAnchored)
 end)
 
--- Spawn dual trucks parked side-by-side for you and your friend!
+-- Spawn dual trucks parked side-by-side for you and your friend on Main Street!
 task.defer(function()
-	local truckPos1 = CFrame.new(12, 1.5, 95) * CFrame.Angles(0, math.rad(180), 0)
-	local truckPos2 = CFrame.new(-12, 1.5, 95) * CFrame.Angles(0, math.rad(180), 0)
+	local truckPos1 = CFrame.new(10, 1.5, 16) * CFrame.Angles(0, math.rad(180), 0)
+	local truckPos2 = CFrame.new(-10, 1.5, 16) * CFrame.Angles(0, math.rad(180), 0)
 
 	local t1 = buildDrivableChaserTruck(truckPos1)
 	t1.Name = "StormChaserTruck_Alpha"
@@ -338,6 +338,6 @@ task.defer(function()
 	local t2 = buildDrivableChaserTruck(truckPos2)
 	t2.Name = "StormChaserTruck_Bravo"
 
-	print("[StormChaserTruckService] Dual Storm Chaser Trucks (Alpha & Bravo) spawned on highway.")
+	print("[StormChaserTruckService] Dual Storm Chaser Trucks (Alpha & Bravo) spawned on Main Street.")
 end)
 
