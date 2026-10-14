@@ -47,8 +47,16 @@ local TORNADO_TYPES = {
 	},
 	Final = {
 		Params = Config.FinalTornado,
-		Shape = { BottomRadius = 34, TopRadius = 124, Height = 220, CloudDiameter = 560 },
-		Physics = {},
+		Shape = { BottomRadius = 60, TopRadius = 190, Height = 240, CloudDiameter = 780 },
+		Physics = {
+			CoreRadius = 50,
+			MaxRadius = 260,
+			MaxTangentialSpeed = 260,
+			InwardPullForce = 220,
+			UpwardLift = 260,
+			CoreHeight = 240,
+			DamagePerSecond = 90,
+		},
 		CellSpeed = 6,
 		Speed = 16,
 	},

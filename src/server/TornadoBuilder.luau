@@ -71,7 +71,7 @@ function TornadoBuilder.Build(name: string, shape: Shape, groundPosition: Vector
 		part.CanTouch = false
 		part.CanQuery = false
 		part.Massless = true
-		part.CastShadow = false
+		part.CastShadow = true
 		part.Material = Enum.Material.SmoothPlastic
 		local weld = Instance.new("WeldConstraint")
 		weld.Part0 = root
@@ -111,11 +111,11 @@ function TornadoBuilder.Build(name: string, shape: Shape, groundPosition: Vector
 				Shape = Enum.ParticleEmitterShape.Sphere,
 				ShapeStyle = Enum.ParticleEmitterShapeStyle.Surface,
 				ShapeInOut = Enum.ParticleEmitterShapeInOut.Outward,
-				Rate = 14,
-				Lifetime = NumberRange.new(2, 3),
-				Speed = NumberRange.new(2, 6),
-				Size = NumberSequence.new(math.min(radius * 0.5, 45), math.min(radius * 0.8, 60)),
-				Transparency = NumberSequence.new(0.45, 1),
+				Rate = 18,
+				Lifetime = NumberRange.new(2.5, 4),
+				Speed = NumberRange.new(3, 8),
+				Size = NumberSequence.new(radius * 0.45, radius * 0.9),
+				Transparency = NumberSequence.new(0.40, 1),
 				Color = ColorSequence.new(layer.Color),
 			})
 			emitter.Parent = layer
