@@ -38,8 +38,8 @@ This repository is set up with [Rojo](https://rojo.space/) so you and your team 
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/chrisxsierra-debug/roblox-funnel-runners.git
-   cd roblox-funnel-runners
+   git clone https://github.com/chrisxsierra-debug/roblox-game.git
+   cd roblox-game
    ```
 
 2. **Open the Game Place**:
