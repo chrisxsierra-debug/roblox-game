@@ -74,3 +74,4 @@ if UserInputService.TouchEnabled then
 end
 
 print("[ChaserFlashlightController] Chaser Flashlight active (Press F to toggle).")
+
