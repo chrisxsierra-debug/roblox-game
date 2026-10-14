@@ -1,8 +1,8 @@
 --!strict
-local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Debris = game:GetService("Debris")
+local CollectionService = game:GetService("CollectionService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Network = require(Shared:WaitForChild("FunnelRunnersNetwork"))
@@ -98,11 +98,19 @@ Network.DopplerScanRequest.OnServerEvent:Connect(function(player: Player)
 	local root = char:FindFirstChild("HumanoidRootPart") :: BasePart
 	if not root then return end
 
-	local worldFolder = Workspace:FindFirstChild("FunnelRunnersWorld")
-	local vortex = worldFolder and worldFolder:FindFirstChild("FunnelRunnersVortex")
-	local vortexRoot = vortex and vortex:FindFirstChild("VortexRoot") :: BasePart
+	-- Scan the nearest tornado that is on the ground (TornadoManager tags and flags them)
+	local vortexRoot: BasePart? = nil
+	for _, tagged in CollectionService:GetTagged("TornadoVortex") do
+		if tagged:IsA("BasePart") and tagged:GetAttribute("TouchedDown") then
+			if not vortexRoot or (tagged.Position - root.Position).Magnitude < (vortexRoot.Position - root.Position).Magnitude then
+				vortexRoot = tagged
+			end
+		end
+	end
 
-	if vortexRoot then
+	if not vortexRoot then
+		Network.DopplerScanResult:FireClient(player, 0, -1, false) -- nothing on the ground to scan
+	else
 		local dist = (vortexRoot.Position - root.Position).Magnitude
 		if dist <= Config.Doppler.MaxScanDistance then
 			-- Proximity multiplier: Closer to eye = massive bonus tokens!

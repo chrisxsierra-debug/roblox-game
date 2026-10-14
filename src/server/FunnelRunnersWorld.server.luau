@@ -1,10 +1,9 @@
 --!strict
 -- FunnelRunnersWorld.server.luau
--- Stormy prairie world: terrain, highway, chaser base, farm, storm bunker and the EF5 wedge tornado model
+-- Stormy prairie world: terrain, highway, chaser base, farm and storm bunker
+-- (tornadoes are built on demand by TornadoBuilder; see TornadoManager)
 --
 -- Visual overhaul notes:
---   * Fixed: Enum.Material.Smoke doesn't exist, which crashed the tornado build (the tornado never appeared)
---   * Fixed: the funnel now welds to VortexRoot, so it follows TornadoManager as the tornado moves
 --   * Fixed: farmhouse roof panels were tilted into a V; the farmhouse also gets side walls and gable ends
 --   * Removes the template Baseplate/SpawnLocation (players could spawn inside the ground)
 --   * Overcast storm lighting with moving storm clouds
@@ -16,7 +15,6 @@ local Lighting = game:GetService("Lighting")
 local CollectionService = game:GetService("CollectionService")
 
 local Terrain = Workspace.Terrain
-local SMOKE_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
 local BARN_RED = Color3.fromRGB(150, 40, 35)
 local WOOD = Color3.fromRGB(95, 70, 48)
 
@@ -660,162 +658,6 @@ local function buildUndergroundStormBunker(parent: Instance)
 	bunker.Parent = parent
 end
 
--- --- EF5 WEDGE TORNADO MODEL ---
-local function smokeEmitter(props: { [string]: any }): ParticleEmitter
-	local emitter = Instance.new("ParticleEmitter")
-	emitter.Texture = SMOKE_TEXTURE
-	emitter.LightInfluence = 1
-	emitter.Rotation = NumberRange.new(0, 360)
-	emitter.RotSpeed = NumberRange.new(-40, 40)
-	for key, value in props do
-		(emitter :: any)[key] = value
-	end
-	return emitter
-end
-
-local function buildWedgeTornado(parent: Instance): (Model, BasePart)
-	local model = Instance.new("Model")
-	model.Name = "FunnelRunnersVortex"
-
-	-- TornadoManager moves this part; everything else is welded to it and follows along
-	local root = makePart({
-		Name = "VortexRoot",
-		Size = Vector3.new(14, 4, 14),
-		Position = Vector3.new(0, 2, -60),
-		CanCollide = false,
-		Transparency = 1,
-	}, model)
-	model.PrimaryPart = root
-
-	local function attachVisual(part: BasePart)
-		part.Anchored = false
-		part.CanCollide = false
-		part.CanTouch = false
-		part.CanQuery = false
-		part.Massless = true
-		part.CastShadow = false
-		local weld = Instance.new("WeldConstraint")
-		weld.Part0 = root
-		weld.Part1 = part
-		weld.Parent = part
-	end
-
-	-- Funnel: 22 stacked rings, a wide wedge at the ground flaring out toward the cloud base
-	local LAYERS, LAYER_HEIGHT = 22, 10
-	for i = 0, LAYERS - 1 do
-		local h = i * LAYER_HEIGHT
-		local t = i / (LAYERS - 1)
-		local radius = 34 + (t ^ 1.6) * 90
-		local layer = makePart({
-			Name = "FunnelLayer_" .. i,
-			Shape = Enum.PartType.Cylinder,
-			Size = Vector3.new(LAYER_HEIGHT + 0.5, radius * 2, radius * 2),
-			CFrame = root.CFrame * CFrame.new(0, h + LAYER_HEIGHT / 2, 0) * CFrame.Angles(0, 0, math.rad(90)),
-			Color = Color3.fromRGB(78, 72, 66):Lerp(Color3.fromRGB(58, 62, 70), t),
-			Transparency = 0.35 - t * 0.2,
-			Material = Enum.Material.SmoothPlastic,
-		}, model)
-		attachVisual(layer)
-
-		-- Smoke puffs off the funnel surface soften the stacked edges
-		if i % 2 == 0 then
-			smokeEmitter({
-				Shape = Enum.ParticleEmitterShape.Sphere,
-				ShapeStyle = Enum.ParticleEmitterShapeStyle.Surface,
-				ShapeInOut = Enum.ParticleEmitterShapeInOut.Outward,
-				Rate = 14,
-				Lifetime = NumberRange.new(2, 3),
-				Speed = NumberRange.new(2, 6),
-				Size = NumberSequence.new(math.min(radius * 0.5, 45), math.min(radius * 0.8, 60)),
-				Transparency = NumberSequence.new(0.45, 1),
-				Color = ColorSequence.new(layer.Color),
-			}).Parent = layer
-		end
-	end
-
-	-- Dark wall cloud the funnel hangs from
-	for _, cloud in {
-		{ Height = 218, Diameter = 300, Thickness = 10 },
-		{ Height = 230, Diameter = 560, Thickness = 14 },
-	} do
-		local disc = makePart({
-			Name = "WallCloud",
-			Shape = Enum.PartType.Cylinder,
-			Size = Vector3.new(cloud.Thickness, cloud.Diameter, cloud.Diameter),
-			CFrame = root.CFrame * CFrame.new(0, cloud.Height, 0) * CFrame.Angles(0, 0, math.rad(90)),
-			Color = Color3.fromRGB(55, 58, 65),
-			Transparency = 0.08,
-			Material = Enum.Material.SmoothPlastic,
-		}, model)
-		attachVisual(disc)
-	end
-
-	-- Swirling streaks: emitters around the funnel fire sideways, all in the same direction of rotation
-	for _, ring in { 15, 50, 95, 150, 200 } do
-		local t = ring / ((LAYERS - 1) * LAYER_HEIGHT)
-		local radius = 34 + (t ^ 1.6) * 90 + 4
-		for k = 1, 6 do
-			local angle = k * math.pi / 3
-			local radial = Vector3.new(math.cos(angle), 0, math.sin(angle))
-			local tangent = Vector3.new(-radial.Z, 0, radial.X)
-			local attachment = Instance.new("Attachment")
-			attachment.Name = "SwirlEmitter"
-			attachment.CFrame = CFrame.fromMatrix(radial * radius + Vector3.new(0, ring, 0), radial, tangent)
-			attachment.Parent = root
-			smokeEmitter({
-				EmissionDirection = Enum.NormalId.Top, -- attachment's Y axis = tangent
-				Rate = 6,
-				Lifetime = NumberRange.new(1.5, 2.5),
-				Speed = NumberRange.new(30, 50),
-				Drag = 1.5,
-				SpreadAngle = Vector2.new(15, 15),
-				Size = NumberSequence.new(10 + radius * 0.15, 20 + radius * 0.25),
-				Transparency = NumberSequence.new(0.35, 1),
-				Color = ColorSequence.new(Color3.fromRGB(75, 75, 80)),
-			}).Parent = attachment
-		end
-	end
-
-	-- Ground debris cloud at the base
-	local dustAttachment = Instance.new("Attachment")
-	dustAttachment.Name = "DebrisCloud"
-	dustAttachment.Position = Vector3.new(0, 4, 0)
-	dustAttachment.Parent = root
-	smokeEmitter({
-		Rate = 60,
-		Lifetime = NumberRange.new(3, 5),
-		Speed = NumberRange.new(25, 45),
-		SpreadAngle = Vector2.new(80, 80),
-		Acceleration = Vector3.new(0, 6, 0),
-		Drag = 1.2,
-		RotSpeed = NumberRange.new(-60, 60),
-		Size = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 20),
-			NumberSequenceKeypoint.new(1, 70),
-		}),
-		Transparency = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 0.3),
-			NumberSequenceKeypoint.new(0.6, 0.5),
-			NumberSequenceKeypoint.new(1, 1),
-		}),
-		Color = ColorSequence.new(Color3.fromRGB(95, 82, 68), Color3.fromRGB(70, 65, 60)),
-	}).Parent = dustAttachment
-
-	-- Howling roar audio
-	local roar = Instance.new("Sound")
-	roar.Name = "TornadoRoarAudio"
-	roar.SoundId = "rbxassetid://9114223171"
-	roar.Volume = 3.5
-	roar.Looped = true
-	roar.RollOffMaxDistance = 500
-	roar.RollOffMinDistance = 50
-	roar.Parent = root
-	roar:Play()
-
-	model.Parent = parent
-	return model, root
-end
-
 local function initializeWorld()
 	removeTemplateParts()
 	setupStormLighting()
@@ -831,7 +673,6 @@ local function initializeWorld()
 	buildFarm(worldFolder)
 	buildScenery(worldFolder)
 	buildUndergroundStormBunker(worldFolder)
-	buildWedgeTornado(worldFolder)
 
 	print("[FunnelRunnersWorld] Storm world with EF5 wedge tornado loaded.")
 end
