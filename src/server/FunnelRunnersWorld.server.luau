@@ -1,112 +1,251 @@
 --!strict
 -- FunnelRunnersWorld.server.luau
--- High-visibility stormy daylight, massive EF5 Wedge Tornado model, destructible barn, and storm bunker
+-- Stormy prairie world: terrain, highway, chaser base, farm, storm bunker and the EF5 wedge tornado model
+--
+-- Visual overhaul notes:
+--   * Fixed: Enum.Material.Smoke doesn't exist, which crashed the tornado build (the tornado never appeared)
+--   * Fixed: the funnel now welds to VortexRoot, so it follows TornadoManager as the tornado moves
+--   * Fixed: farmhouse roof panels were tilted into a V; the farmhouse also gets side walls and gable ends
+--   * Removes the template Baseplate/SpawnLocation (players could spawn inside the ground)
+--   * Overcast storm lighting with moving storm clouds
+--   * Terrain ground with hills, a pond and a dirt farmyard; trees, fences, hay bales, a silo and power lines
+--   * Lighting Technology is now "Future" in default.project.json (it can't be set from a script)
 
 local Workspace = game:GetService("Workspace")
 local Lighting = game:GetService("Lighting")
 local CollectionService = game:GetService("CollectionService")
 
-local function setupBrightStormAtmosphere()
-	-- Clear daylight stormy look (bright enough to see everything clearly!)
-	Lighting.Brightness = 2.2
-	Lighting.ClockTime = 14.0 -- Mid-afternoon storm
-	Lighting.OutdoorAmbient = Color3.fromRGB(120, 130, 140)
-	Lighting.Ambient = Color3.fromRGB(90, 95, 105)
-	Lighting.GlobalShadows = true
-	Lighting.FogColor = Color3.fromRGB(130, 140, 150)
-	Lighting.FogStart = 200
-	Lighting.FogEnd = 1200
+local Terrain = Workspace.Terrain
+local SMOKE_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
+local BARN_RED = Color3.fromRGB(150, 40, 35)
+local WOOD = Color3.fromRGB(95, 70, 48)
 
-	-- Clear out dark tints
+-- Creates an anchored part from a property table (ClassName picks Part, WedgePart, etc.)
+local function makePart(props: { [string]: any }, parent: Instance): BasePart
+	local part = Instance.new(props.ClassName or "Part") :: BasePart
+	part.Anchored = true
+	part.TopSurface = Enum.SurfaceType.Smooth
+	part.BottomSurface = Enum.SurfaceType.Smooth
+	for key, value in props do
+		if key ~= "ClassName" then
+			(part :: any)[key] = value
+		end
+	end
+	part.Parent = parent
+	return part
+end
+
+-- Tagged parts get ripped off by the tornado (see RankineVortexEngine)
+local function destructible(part: BasePart): BasePart
+	CollectionService:AddTag(part, "DestructibleStructure")
+	return part
+end
+
+local function removeTemplateParts()
+	-- The starter Baseplate and SpawnLocation sit inside the prairie ground; players could spawn there
+	for _, name in { "Baseplate", "SpawnLocation" } do
+		local part = Workspace:FindFirstChild(name)
+		if part then
+			part:Destroy()
+		end
+	end
+end
+
+local function setupStormLighting()
+	-- Overcast late-afternoon storm: moody, but still bright enough to see the tornado
+	Lighting.ClockTime = 16.5
+	Lighting.Brightness = 1.6
+	Lighting.Ambient = Color3.fromRGB(70, 75, 85)
+	Lighting.OutdoorAmbient = Color3.fromRGB(105, 110, 120)
+	Lighting.EnvironmentDiffuseScale = 0.6
+	Lighting.EnvironmentSpecularScale = 0.4
+	Lighting.GlobalShadows = true
+	Lighting.ShadowSoftness = 0.5
+
 	for _, child in Lighting:GetChildren() do
 		if child:IsA("PostProcessEffect") or child:IsA("Atmosphere") then
 			child:Destroy()
 		end
 	end
 
+	-- Hide the bright sun disc behind the storm clouds
+	local sky = Lighting:FindFirstChildOfClass("Sky")
+	if sky then
+		sky.CelestialBodiesShown = false
+		sky.StarCount = 0
+	end
+
 	local atmosphere = Instance.new("Atmosphere")
-	atmosphere.Density = 0.28 -- Light mist, not blinding pitch black
-	atmosphere.Offset = 0.25
-	atmosphere.Color = Color3.fromRGB(140, 155, 160)
-	atmosphere.Decay = Color3.fromRGB(100, 110, 115)
-	atmosphere.Haze = 1.5
+	atmosphere.Density = 0.42
+	atmosphere.Offset = 0.15
+	atmosphere.Color = Color3.fromRGB(115, 122, 130)
+	atmosphere.Decay = Color3.fromRGB(70, 76, 84)
+	atmosphere.Glare = 0
+	atmosphere.Haze = 2.2
 	atmosphere.Parent = Lighting
 
 	local colorCorrection = Instance.new("ColorCorrectionEffect")
-	colorCorrection.Brightness = 0.02
-	colorCorrection.Contrast = 0.15
-	colorCorrection.Saturation = -0.1
-	colorCorrection.TintColor = Color3.fromRGB(240, 245, 250)
+	colorCorrection.Contrast = 0.12
+	colorCorrection.Saturation = -0.25
+	colorCorrection.TintColor = Color3.fromRGB(220, 230, 240)
 	colorCorrection.Parent = Lighting
 
 	local bloom = Instance.new("BloomEffect")
-	bloom.Intensity = 0.3
-	bloom.Size = 18
-	bloom.Threshold = 0.9
+	bloom.Intensity = 0.25
+	bloom.Size = 20
+	bloom.Threshold = 1.2 -- only bright things like lightning bloom
 	bloom.Parent = Lighting
+
+	-- Thick, moving storm clouds
+	local oldClouds = Terrain:FindFirstChildOfClass("Clouds")
+	if oldClouds then
+		oldClouds:Destroy()
+	end
+	local clouds = Instance.new("Clouds")
+	clouds.Cover = 0.85
+	clouds.Density = 0.8
+	clouds.Color = Color3.fromRGB(85, 90, 100)
+	clouds.Parent = Terrain
 end
 
-local function buildHighwayAndPrairie(parent: Folder)
-	-- Prairie Field Base
-	local grass = Instance.new("Part")
-	grass.Name = "PrairieGround"
-	grass.Size = Vector3.new(800, 2, 800)
-	grass.Position = Vector3.new(0, 0, 0)
-	grass.Anchored = true
-	grass.Color = Color3.fromRGB(85, 115, 65)
-	grass.Material = Enum.Material.Grass
-	grass.Parent = parent
+local function buildTerrain()
+	Terrain:SetMaterialColor(Enum.Material.Grass, Color3.fromRGB(92, 112, 64))
+	Terrain:SetMaterialColor(Enum.Material.Ground, Color3.fromRGB(102, 86, 64))
+	Terrain:SetMaterialColor(Enum.Material.Mud, Color3.fromRGB(70, 58, 45))
 
-	-- Asphalt Highway
-	local road = Instance.new("Part")
-	road.Name = "Highway"
-	road.Size = Vector3.new(40, 1.2, 700)
-	road.Position = Vector3.new(0, 1.1, 0)
-	road.Anchored = true
-	road.Color = Color3.fromRGB(50, 50, 55)
-	road.Material = Enum.Material.Asphalt
-	road.Parent = parent
+	-- Flat prairie with its surface at y = 1 (same height as the old ground part).
+	-- It stops at y = -11, above the underground bunker at y = -31..-13.
+	Terrain:FillBlock(CFrame.new(0, -5, 0), Vector3.new(1200, 12, 1200), Enum.Material.Grass)
 
-	-- Yellow Double Centerlines
-	for offset = -1.2, 1.2, 2.4 do
-		local line = Instance.new("Part")
-		line.Name = "CenterLine"
-		line.Size = Vector3.new(0.6, 1.3, 690)
-		line.Position = Vector3.new(offset, 1.15, 0)
-		line.Anchored = true
-		line.Color = Color3.fromRGB(255, 210, 40)
-		line.Material = Enum.Material.Neon
-		line.Parent = parent
+	-- Ring of rolling hills around the map edge
+	local rng = Random.new(7)
+	for i = 1, 28 do
+		local angle = (i / 28) * math.pi * 2 + rng:NextNumber(-0.1, 0.1)
+		local dist = rng:NextNumber(420, 520)
+		local radius = rng:NextNumber(60, 110)
+		Terrain:FillBall(Vector3.new(math.cos(angle) * dist, -radius * 0.55, math.sin(angle) * dist), radius, Enum.Material.Grass)
 	end
 
-	-- Telephone Poles along road
+	-- Farm pond with a muddy bank
+	local pond = Vector3.new(130, 0, -70)
+	Terrain:FillCylinder(CFrame.new(pond + Vector3.new(0, -3, 0)), 8, 34, Enum.Material.Mud)
+	Terrain:FillCylinder(CFrame.new(pond + Vector3.new(0, -2, 0)), 8, 28, Enum.Material.Air)
+	Terrain:FillCylinder(CFrame.new(pond + Vector3.new(0, -3.5, 0)), 5, 28, Enum.Material.Water)
+
+	-- Dirt yard around the farmhouse
+	local yard = Region3.new(Vector3.new(-92, -4, -52), Vector3.new(-36, 4, 12)):ExpandToGrid(4)
+	Terrain:ReplaceMaterial(yard, 4, Enum.Material.Grass, Enum.Material.Ground)
+end
+
+local function buildHighway(parent: Instance)
+	makePart({
+		Name = "Highway",
+		Size = Vector3.new(40, 1.2, 700),
+		Position = Vector3.new(0, 1.1, 0),
+		Color = Color3.fromRGB(50, 50, 55),
+		Material = Enum.Material.Asphalt,
+	}, parent)
+
+	-- Gravel shoulders
+	for _, x in { -22, 22 } do
+		makePart({
+			Name = "Shoulder",
+			Size = Vector3.new(4, 1, 700),
+			Position = Vector3.new(x, 1, 0),
+			Color = Color3.fromRGB(105, 100, 92),
+			Material = Enum.Material.Pebble,
+		}, parent)
+	end
+
+	-- Painted lines (plain paint instead of glowing neon)
+	for _, line in {
+		{ X = -1.2, Color = Color3.fromRGB(230, 190, 40) },
+		{ X = 1.2, Color = Color3.fromRGB(230, 190, 40) },
+		{ X = -18.8, Color = Color3.fromRGB(225, 225, 220) },
+		{ X = 18.8, Color = Color3.fromRGB(225, 225, 220) },
+	} do
+		makePart({
+			Name = "RoadLine",
+			Size = Vector3.new(0.6, 1.3, 690),
+			Position = Vector3.new(line.X, 1.15, 0),
+			Color = line.Color,
+			Material = Enum.Material.SmoothPlastic,
+		}, parent)
+	end
+
+	-- Telephone poles with sagging power lines
+	local previousEnds: { Attachment }? = nil
 	for z = -300, 300, 50 do
-		local pole = Instance.new("Part")
-		pole.Name = "UtilityPole"
-		pole.Size = Vector3.new(1.4, 30, 1.4)
-		pole.Position = Vector3.new(25, 15, z)
-		pole.Anchored = true
-		pole.Color = Color3.fromRGB(90, 65, 40)
-		pole.Material = Enum.Material.Wood
-		pole.Parent = parent
+		makePart({
+			Name = "UtilityPole",
+			Size = Vector3.new(1.4, 30, 1.4),
+			Position = Vector3.new(25, 15, z),
+			Color = Color3.fromRGB(90, 65, 40),
+			Material = Enum.Material.Wood,
+		}, parent)
 
-		local crossArm = Instance.new("Part")
-		crossArm.Size = Vector3.new(8, 1, 1)
-		crossArm.Position = Vector3.new(25, 28, z)
-		crossArm.Anchored = true
-		crossArm.Color = Color3.fromRGB(80, 55, 30)
-		crossArm.Material = Enum.Material.Wood
-		crossArm.Parent = parent
+		local crossArm = makePart({
+			Name = "CrossArm",
+			Size = Vector3.new(8, 1, 1),
+			Position = Vector3.new(25, 28, z),
+			Color = Color3.fromRGB(80, 55, 30),
+			Material = Enum.Material.Wood,
+		}, parent)
+
+		local ends: { Attachment } = {}
+		for _, dx in { -3.5, 3.5 } do
+			makePart({
+				Name = "Insulator",
+				Size = Vector3.new(0.5, 0.8, 0.5),
+				Position = Vector3.new(25 + dx, 28.9, z),
+				Color = Color3.fromRGB(120, 160, 140),
+				Material = Enum.Material.Glass,
+			}, parent)
+
+			-- Attachment X axis points down so the wire curves downward between poles
+			local attachment = Instance.new("Attachment")
+			attachment.CFrame = CFrame.fromMatrix(Vector3.new(dx, 0.8, 0), Vector3.new(0, -1, 0), Vector3.new(1, 0, 0))
+			attachment.Parent = crossArm
+			table.insert(ends, attachment)
+		end
+
+		if previousEnds then
+			for i, attachment in ends do
+				local wire = Instance.new("Beam")
+				wire.Attachment0 = previousEnds[i]
+				wire.Attachment1 = attachment
+				wire.Width0 = 0.15
+				wire.Width1 = 0.15
+				wire.CurveSize0 = 5
+				wire.CurveSize1 = -5
+				wire.Segments = 12
+				wire.FaceCamera = true
+				wire.Color = ColorSequence.new(Color3.fromRGB(20, 20, 22))
+				wire.Transparency = NumberSequence.new(0)
+				wire.LightInfluence = 1
+				wire.Parent = crossArm
+			end
+		end
+		previousEnds = ends
 	end
 
-	-- Road Warning Signboard
-	local signBoard = Instance.new("Part")
-	signBoard.Size = Vector3.new(0.6, 7, 14)
-	signBoard.Position = Vector3.new(28, 12, 40)
-	signBoard.Anchored = true
-	signBoard.Color = Color3.fromRGB(25, 125, 50)
-	signBoard.Material = Enum.Material.SmoothPlastic
-	signBoard.Parent = parent
+	-- Road warning sign on two posts
+	local signBoard = makePart({
+		Name = "WarningSign",
+		Size = Vector3.new(0.6, 7, 14),
+		Position = Vector3.new(28, 12, 40),
+		Color = Color3.fromRGB(25, 125, 50),
+		Material = Enum.Material.SmoothPlastic,
+	}, parent)
+	for _, dz in { -5, 5 } do
+		makePart({
+			Name = "SignPost",
+			Size = Vector3.new(0.8, 12, 0.8),
+			Position = Vector3.new(28.7, 7, 40 + dz),
+			Color = Color3.fromRGB(140, 140, 145),
+			Material = Enum.Material.Metal,
+		}, parent)
+	end
 
 	local signGui = Instance.new("SurfaceGui")
 	signGui.Face = Enum.NormalId.Back
@@ -123,11 +262,10 @@ local function buildHighwayAndPrairie(parent: Folder)
 	signText.Parent = signGui
 end
 
-local function buildChaserSpawnBase(parent: Folder)
+local function buildChaserSpawnBase(parent: Instance)
 	local base = Instance.new("Model")
 	base.Name = "ChaserSpawnBase"
 
-	-- Spawn Location
 	local spawn = Instance.new("SpawnLocation")
 	spawn.Name = "ChaserSpawn"
 	spawn.Size = Vector3.new(18, 1.2, 18)
@@ -138,33 +276,51 @@ local function buildChaserSpawnBase(parent: Folder)
 	spawn.Duration = 0
 	spawn.Parent = base
 
-	-- Chaser Base HQ Trailer
-	local trailer = Instance.new("Part")
-	trailer.Name = "ResearchHQ"
-	trailer.Size = Vector3.new(28, 12, 18)
-	trailer.Position = Vector3.new(-26, 7, 120)
-	trailer.Anchored = true
-	trailer.Color = Color3.fromRGB(190, 195, 200)
-	trailer.Material = Enum.Material.Metal
-	trailer.Parent = base
+	-- Research HQ trailer
+	local trailer = makePart({
+		Name = "ResearchHQ",
+		Size = Vector3.new(28, 12, 18),
+		Position = Vector3.new(-26, 7, 120),
+		Color = Color3.fromRGB(190, 195, 200),
+		Material = Enum.Material.Metal,
+	}, base)
+	local p = trailer.Position
 
-	-- Spinning Doppler Radar Dish on Base
-	local dishMast = Instance.new("Part")
-	dishMast.Size = Vector3.new(2, 10, 2)
-	dishMast.Position = trailer.Position + Vector3.new(0, 10, 0)
-	dishMast.Anchored = true
-	dishMast.Color = Color3.fromRGB(100, 100, 105)
-	dishMast.Parent = base
+	makePart({ Name = "Skirt", Size = Vector3.new(28.4, 2.2, 18.4), Position = p + Vector3.new(0, -4.9, 0), Color = Color3.fromRGB(45, 48, 52), Material = Enum.Material.Metal }, base)
+	makePart({ Name = "Stripe", Size = Vector3.new(28.3, 1.4, 18.3), Position = p + Vector3.new(0, 0.6, 0), Color = Color3.fromRGB(230, 120, 30), Material = Enum.Material.SmoothPlastic }, base)
+	for _, dx in { -8, 0, 8 } do
+		for _, side in { -1, 1 } do
+			makePart({
+				Name = "Window",
+				Size = Vector3.new(5, 2.6, 0.3),
+				Position = p + Vector3.new(dx, 3.2, side * 9.1),
+				Color = Color3.fromRGB(60, 80, 100),
+				Material = Enum.Material.Glass,
+				Reflectance = 0.25,
+			}, base)
+		end
+	end
+	makePart({ Name = "Door", Size = Vector3.new(0.3, 7.5, 4), Position = p + Vector3.new(14.1, -1.85, -3), Color = Color3.fromRGB(70, 75, 80), Material = Enum.Material.Metal }, base)
+	makePart({ Name = "Steps", Size = Vector3.new(3, 1, 4.5), Position = p + Vector3.new(15.6, -5.5, -3), Color = Color3.fromRGB(120, 120, 125), Material = Enum.Material.DiamondPlate }, base)
+	makePart({ Name = "ACUnit", Size = Vector3.new(5, 2, 4), Position = p + Vector3.new(6, 7, 0), Color = Color3.fromRGB(205, 205, 210), Material = Enum.Material.Metal }, base)
 
-	local dish = Instance.new("Part")
-	dish.Name = "DopplerDish"
-	dish.Shape = Enum.PartType.Cylinder
-	dish.Size = Vector3.new(2.5, 12, 12)
-	dish.CFrame = CFrame.new(dishMast.Position + Vector3.new(0, 5, 0)) * CFrame.Angles(0, 0, math.rad(90))
-	dish.Anchored = true
-	dish.Color = Color3.fromRGB(245, 245, 250)
-	dish.Material = Enum.Material.SmoothPlastic
-	dish.Parent = base
+	-- Spinning Doppler radar dish
+	local dishMast = makePart({
+		Name = "DishMast",
+		Size = Vector3.new(2, 10, 2),
+		Position = p + Vector3.new(0, 10, 0),
+		Color = Color3.fromRGB(100, 100, 105),
+		Material = Enum.Material.Metal,
+	}, base)
+
+	local dish = makePart({
+		Name = "DopplerDish",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(2.5, 12, 12),
+		CFrame = CFrame.new(dishMast.Position + Vector3.new(0, 5, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = Color3.fromRGB(245, 245, 250),
+		Material = Enum.Material.SmoothPlastic,
+	}, base)
 
 	task.spawn(function()
 		while dish.Parent do
@@ -176,99 +332,228 @@ local function buildChaserSpawnBase(parent: Folder)
 	base.Parent = parent
 end
 
-local function buildDestructibleFarmhouse(parent: Folder)
+local function buildFenceLine(from: Vector3, to: Vector3, parent: Instance)
+	local delta = to - from
+	local count = math.max(1, math.round(delta.Magnitude / 8))
+	local step = delta / count
+	for i = 0, count do
+		local base = from + step * i
+		destructible(makePart({
+			Name = "FencePost",
+			Size = Vector3.new(0.8, 5, 0.8),
+			Position = base + Vector3.new(0, 2.5, 0),
+			Color = WOOD,
+			Material = Enum.Material.Wood,
+		}, parent))
+		if i < count then
+			for _, height in { 2.2, 4.2 } do
+				local mid = base + step / 2 + Vector3.new(0, height, 0)
+				destructible(makePart({
+					Name = "FenceRail",
+					Size = Vector3.new(0.4, 0.5, step.Magnitude),
+					CFrame = CFrame.lookAt(mid, mid + step),
+					Color = WOOD,
+					Material = Enum.Material.Wood,
+				}, parent))
+			end
+		end
+	end
+end
+
+local function buildFarm(parent: Instance)
 	local house = Instance.new("Model")
 	house.Name = "DestructibleFarmhouse"
 
 	local houseCenter = Vector3.new(-65, 1, -20)
 
-	-- Foundation
-	local foundation = Instance.new("Part")
-	foundation.Size = Vector3.new(42, 2, 52)
-	foundation.Position = houseCenter + Vector3.new(0, 1, 0)
-	foundation.Anchored = true
-	foundation.Color = Color3.fromRGB(115, 115, 120)
-	foundation.Material = Enum.Material.Concrete
-	foundation.Parent = house
+	makePart({
+		Name = "Foundation",
+		Size = Vector3.new(42, 2, 52),
+		Position = houseCenter + Vector3.new(0, 1, 0),
+		Color = Color3.fromRGB(115, 115, 120),
+		Material = Enum.Material.Concrete,
+	}, house)
 
-	-- Breakable Wall Planks & Siding (Tagged DestructibleStructure for Tornado to rip off!)
+	-- Front/back walls (planks run along X) and side walls (planks run along Z)
 	for y = 4, 18, 3.5 do
 		for x = -18, 18, 9 do
-			local plankF = Instance.new("Part")
-			plankF.Name = "WallPlank_Front"
-			plankF.Size = Vector3.new(8.5, 3.2, 1.2)
-			plankF.Position = houseCenter + Vector3.new(x, y, -25)
-			plankF.Anchored = true
-			plankF.Color = Color3.fromRGB(175, 45, 45) -- Barn red
-			plankF.Material = Enum.Material.WoodPlanks
-			CollectionService:AddTag(plankF, "DestructibleStructure")
-			plankF.Parent = house
-
-			local plankB = Instance.new("Part")
-			plankB.Name = "WallPlank_Back"
-			plankB.Size = Vector3.new(8.5, 3.2, 1.2)
-			plankB.Position = houseCenter + Vector3.new(x, y, 25)
-			plankB.Anchored = true
-			plankB.Color = Color3.fromRGB(175, 45, 45)
-			plankB.Material = Enum.Material.WoodPlanks
-			CollectionService:AddTag(plankB, "DestructibleStructure")
-			plankB.Parent = house
+			for _, z in { -25, 25 } do
+				destructible(makePart({
+					Name = "WallPlank",
+					Size = Vector3.new(8.5, 3.2, 1.2),
+					Position = houseCenter + Vector3.new(x, y, z),
+					Color = BARN_RED,
+					Material = Enum.Material.WoodPlanks,
+				}, house))
+			end
+		end
+		for i = -2, 2 do
+			for _, x in { -21.4, 21.4 } do
+				destructible(makePart({
+					Name = "WallPlank",
+					Size = Vector3.new(1.2, 3.2, 9.5),
+					Position = houseCenter + Vector3.new(x, y, i * 9.6),
+					Color = BARN_RED,
+					Material = Enum.Material.WoodPlanks,
+				}, house))
+			end
 		end
 	end
 
-	-- Breakable Tin Roof Panels
-	for z = -20, 20, 10 do
-		local roofL = Instance.new("Part")
-		roofL.Name = "RoofPanel_Left"
-		roofL.Size = Vector3.new(24, 1.2, 9.5)
-		roofL.CFrame = CFrame.new(houseCenter + Vector3.new(-11, 23, z)) * CFrame.Angles(0, 0, math.rad(-25))
-		roofL.Anchored = true
-		roofL.Color = Color3.fromRGB(150, 155, 160)
-		roofL.Material = Enum.Material.CorrodedMetal
-		CollectionService:AddTag(roofL, "DestructibleStructure")
-		roofL.Parent = house
+	-- Gable ends: two wedges per end, rising toward the ridge at x = 0
+	for _, z in { -25, 25 } do
+		for _, side in { -1, 1 } do
+			local center = houseCenter + Vector3.new(side * 10.7, 19.6 + 5, z)
+			destructible(makePart({
+				ClassName = "WedgePart",
+				Name = "Gable",
+				Size = Vector3.new(1.2, 10, 21.4),
+				CFrame = CFrame.fromMatrix(center, Vector3.new(0, 0, side), Vector3.yAxis),
+				Color = BARN_RED,
+				Material = Enum.Material.WoodPlanks,
+			}, house))
+		end
+	end
 
-		local roofR = Instance.new("Part")
-		roofR.Name = "RoofPanel_Right"
-		roofR.Size = Vector3.new(24, 1.2, 9.5)
-		roofR.CFrame = CFrame.new(houseCenter + Vector3.new(11, 23, z)) * CFrame.Angles(0, 0, math.rad(25))
-		roofR.Anchored = true
-		roofR.Color = Color3.fromRGB(150, 155, 160)
-		roofR.Material = Enum.Material.CorrodedMetal
-		CollectionService:AddTag(roofR, "DestructibleStructure")
-		roofR.Parent = house
+	-- Tin roof sloping down from the ridge on both sides
+	for z = -20, 20, 10 do
+		for _, side in { -1, 1 } do
+			destructible(makePart({
+				Name = "RoofPanel",
+				Size = Vector3.new(24, 1.2, 10.5),
+				CFrame = CFrame.new(houseCenter + Vector3.new(side * 11, 25.5, z)) * CFrame.Angles(0, 0, math.rad(-side * 25)),
+				Color = Color3.fromRGB(150, 155, 160),
+				Material = Enum.Material.CorrodedMetal,
+			}, house))
+		end
+	end
+	makePart({
+		Name = "RidgeCap",
+		Size = Vector3.new(2, 1, 54),
+		Position = houseCenter + Vector3.new(0, 30.8, 0),
+		Color = Color3.fromRGB(120, 125, 130),
+		Material = Enum.Material.CorrodedMetal,
+	}, house)
+
+	-- Door and windows
+	destructible(makePart({ Name = "Door", Size = Vector3.new(6, 9, 0.4), Position = houseCenter + Vector3.new(0, 6.5, -25.8), Color = Color3.fromRGB(70, 50, 35), Material = Enum.Material.Wood }, house))
+	for _, z in { -25.8, 25.8 } do
+		for _, x in { -12, 12 } do
+			destructible(makePart({ Name = "WindowTrim", Size = Vector3.new(5.6, 4.6, 0.3), Position = houseCenter + Vector3.new(x, 11, z), Color = Color3.fromRGB(235, 230, 220), Material = Enum.Material.Wood }, house))
+			destructible(makePart({ Name = "Window", Size = Vector3.new(4.8, 3.8, 0.3), Position = houseCenter + Vector3.new(x, 11, z + math.sign(z) * 0.1), Color = Color3.fromRGB(45, 55, 65), Material = Enum.Material.Glass, Reflectance = 0.2 }, house))
+		end
 	end
 
 	house.Parent = parent
+
+	-- Farmyard: fence with a gate gap facing the highway, silo, hay bales
+	local yard = Instance.new("Model")
+	yard.Name = "Farmyard"
+	buildFenceLine(Vector3.new(-112, 1, -70), Vector3.new(-32, 1, -70), yard)
+	buildFenceLine(Vector3.new(-112, 1, 30), Vector3.new(-32, 1, 30), yard)
+	buildFenceLine(Vector3.new(-112, 1, -70), Vector3.new(-112, 1, 30), yard)
+	buildFenceLine(Vector3.new(-32, 1, -70), Vector3.new(-32, 1, -30), yard)
+	buildFenceLine(Vector3.new(-32, 1, -10), Vector3.new(-32, 1, 30), yard)
+
+	makePart({
+		Name = "Silo",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(36, 14, 14),
+		CFrame = CFrame.new(-100, 19, 15) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = Color3.fromRGB(165, 170, 175),
+		Material = Enum.Material.CorrodedMetal,
+	}, yard)
+	makePart({
+		Name = "SiloDome",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(14, 14, 14),
+		Position = Vector3.new(-100, 37, 15),
+		Color = Color3.fromRGB(120, 125, 130),
+		Material = Enum.Material.Metal,
+	}, yard)
+
+	local rng = Random.new(11)
+	for _, spot in { Vector2.new(-50, 18), Vector2.new(-55, 22), Vector2.new(-48, 24), Vector2.new(-95, -55), Vector2.new(-90, -60), Vector2.new(-100, -50) } do
+		destructible(makePart({
+			Name = "HayBale",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(4, 4.5, 4.5),
+			CFrame = CFrame.new(spot.X, 3.25, spot.Y) * CFrame.Angles(0, rng:NextNumber(0, math.pi), 0),
+			Color = Color3.fromRGB(196, 168, 96),
+			Material = Enum.Material.Fabric,
+		}, yard))
+	end
+
+	yard.Parent = parent
 end
 
-local function buildUndergroundStormBunker(parent: Folder)
+local function buildTree(position: Vector3, height: number, rng: Random, parent: Instance)
+	local tree = Instance.new("Model")
+	tree.Name = "Tree"
+	makePart({
+		Name = "Trunk",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(height * 0.6, 2.2, 2.2),
+		CFrame = CFrame.new(position + Vector3.new(0, height * 0.3, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = Color3.fromRGB(85, 62, 45),
+		Material = Enum.Material.Wood,
+	}, tree)
+	for _ = 1, 4 do
+		local size = height * rng:NextNumber(0.35, 0.5)
+		local offset = Vector3.new(rng:NextNumber(-0.15, 0.15) * height, height * rng:NextNumber(0.6, 0.85), rng:NextNumber(-0.15, 0.15) * height)
+		makePart({
+			Name = "Leaves",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(size, size, size),
+			Position = position + offset,
+			Color = Color3.fromRGB(rng:NextInteger(55, 75), rng:NextInteger(80, 100), rng:NextInteger(42, 55)),
+			Material = Enum.Material.Grass,
+		}, tree)
+	end
+	tree.Parent = parent
+end
+
+local function buildScenery(parent: Instance)
+	local trees = Instance.new("Folder")
+	trees.Name = "Trees"
+	local rng = Random.new(3)
+	local placed = 0
+	while placed < 40 do
+		local x, z = rng:NextNumber(-380, 380), rng:NextNumber(-380, 380)
+		local nearRoad = math.abs(x) < 50
+		local inFarmyard = x > -125 and x < -20 and z > -85 and z < 45
+		local nearPond = (Vector2.new(x, z) - Vector2.new(130, -70)).Magnitude < 45
+		if not (nearRoad or inFarmyard or nearPond) then
+			buildTree(Vector3.new(x, 1, z), rng:NextNumber(18, 30), rng, trees)
+			placed += 1
+		end
+	end
+	trees.Parent = parent
+end
+
+local function buildUndergroundStormBunker(parent: Instance)
 	local bunker = Instance.new("Model")
 	bunker.Name = "UndergroundBunker"
 
-	local bunkerPos = Vector3.new(0, 1, 30) -- Right next to the highway in plain sight!
+	local bunkerPos = Vector3.new(0, 1, 30)
 	local interiorPos = Vector3.new(0, -30, 30)
 
-	-- Surface Collar
-	local collar = Instance.new("Part")
-	collar.Name = "BunkerSurfaceCollar"
-	collar.Size = Vector3.new(24, 3.5, 24)
-	collar.Position = bunkerPos + Vector3.new(0, 1.75, 0)
-	collar.Anchored = true
-	collar.Color = Color3.fromRGB(90, 85, 80)
-	collar.Material = Enum.Material.Concrete
-	collar.Parent = bunker
+	makePart({
+		Name = "BunkerSurfaceCollar",
+		Size = Vector3.new(24, 3.5, 24),
+		Position = bunkerPos + Vector3.new(0, 1.75, 0),
+		Color = Color3.fromRGB(90, 85, 80),
+		Material = Enum.Material.Concrete,
+	}, bunker)
 
-	-- Yellow Hazard Blast Hatch
-	local hatch = Instance.new("Part")
-	hatch.Name = "BlastHatch"
-	hatch.Size = Vector3.new(14, 1.2, 14)
-	hatch.CFrame = CFrame.new(bunkerPos + Vector3.new(0, 3.8, 0)) * CFrame.Angles(math.rad(18), 0, 0)
-	hatch.Anchored = true
-	hatch.Color = Color3.fromRGB(245, 190, 20)
-	hatch.Material = Enum.Material.DiamondPlate
-	hatch.CanCollide = false
-	hatch.Parent = bunker
+	local hatch = makePart({
+		Name = "BlastHatch",
+		Size = Vector3.new(14, 1.2, 14),
+		CFrame = CFrame.new(bunkerPos + Vector3.new(0, 3.8, 0)) * CFrame.Angles(math.rad(18), 0, 0),
+		Color = Color3.fromRGB(245, 190, 20),
+		Material = Enum.Material.DiamondPlate,
+		CanCollide = false,
+	}, bunker)
 
 	local hatchBillboard = Instance.new("BillboardGui")
 	hatchBillboard.Size = UDim2.new(12, 0, 3, 0)
@@ -287,34 +572,27 @@ local function buildUndergroundStormBunker(parent: Folder)
 	label.Parent = hatchBillboard
 
 	-- Teleport into shelter
-	local entrancePad = Instance.new("Part")
-	entrancePad.Name = "EntrancePad"
-	entrancePad.Size = Vector3.new(12, 1, 12)
-	entrancePad.Position = bunkerPos + Vector3.new(0, 1.8, 0)
-	entrancePad.Anchored = true
-	entrancePad.Transparency = 0.5
-	entrancePad.Color = Color3.fromRGB(50, 220, 255)
-	entrancePad.Material = Enum.Material.Neon
-	entrancePad.CanCollide = false
-	entrancePad.Parent = bunker
+	local entrancePad = makePart({
+		Name = "EntrancePad",
+		Size = Vector3.new(12, 1, 12),
+		Position = bunkerPos + Vector3.new(0, 1.8, 0),
+		Transparency = 0.5,
+		Color = Color3.fromRGB(50, 220, 255),
+		Material = Enum.Material.Neon,
+		CanCollide = false,
+	}, bunker)
 
-	-- Interior Room
-	local floor = Instance.new("Part")
-	floor.Name = "ShelterFloor"
-	floor.Size = Vector3.new(48, 2, 48)
-	floor.Position = interiorPos
-	floor.Anchored = true
-	floor.Color = Color3.fromRGB(65, 65, 70)
-	floor.Material = Enum.Material.Concrete
-	floor.Parent = bunker
-
-	local ceiling = Instance.new("Part")
-	ceiling.Size = Vector3.new(48, 2, 48)
-	ceiling.Position = interiorPos + Vector3.new(0, 16, 0)
-	ceiling.Anchored = true
-	ceiling.Color = Color3.fromRGB(55, 55, 60)
-	ceiling.Material = Enum.Material.Concrete
-	ceiling.Parent = bunker
+	-- Interior room
+	makePart({ Name = "ShelterFloor", Size = Vector3.new(48, 2, 48), Position = interiorPos, Color = Color3.fromRGB(65, 65, 70), Material = Enum.Material.Concrete }, bunker)
+	local ceiling = makePart({ Name = "ShelterCeiling", Size = Vector3.new(48, 2, 48), Position = interiorPos + Vector3.new(0, 16, 0), Color = Color3.fromRGB(55, 55, 60), Material = Enum.Material.Concrete }, bunker)
+	for _, wall in {
+		{ Offset = Vector3.new(0, 8, -24.5), Size = Vector3.new(48, 18, 1) },
+		{ Offset = Vector3.new(0, 8, 24.5), Size = Vector3.new(48, 18, 1) },
+		{ Offset = Vector3.new(-24.5, 8, 0), Size = Vector3.new(1, 18, 48) },
+		{ Offset = Vector3.new(24.5, 8, 0), Size = Vector3.new(1, 18, 48) },
+	} do
+		makePart({ Name = "ShelterWall", Size = wall.Size, Position = interiorPos + wall.Offset, Color = Color3.fromRGB(75, 75, 80), Material = Enum.Material.Concrete }, bunker)
+	end
 
 	local redLight = Instance.new("PointLight")
 	redLight.Color = Color3.fromRGB(255, 80, 60)
@@ -322,15 +600,25 @@ local function buildUndergroundStormBunker(parent: Folder)
 	redLight.Range = 45
 	redLight.Parent = ceiling
 
-	-- Exit Ladder
-	local exitLadder = Instance.new("Part")
-	exitLadder.Name = "ExitLadder"
-	exitLadder.Size = Vector3.new(5, 14, 1.2)
-	exitLadder.Position = interiorPos + Vector3.new(0, 7, 22)
-	exitLadder.Anchored = true
-	exitLadder.Color = Color3.fromRGB(240, 200, 30)
-	exitLadder.Material = Enum.Material.DiamondPlate
-	exitLadder.Parent = bunker
+	for _, x in { -12, 12 } do
+		local lamp = makePart({ Name = "CeilingLamp", Size = Vector3.new(4, 0.6, 1.5), Position = interiorPos + Vector3.new(x, 14.7, 0), Color = Color3.fromRGB(255, 240, 215), Material = Enum.Material.Neon }, bunker)
+		local lampLight = Instance.new("PointLight")
+		lampLight.Color = Color3.fromRGB(255, 235, 200)
+		lampLight.Brightness = 1.5
+		lampLight.Range = 30
+		lampLight.Parent = lamp
+	end
+	for _, x in { -21, 21 } do
+		makePart({ Name = "Bench", Size = Vector3.new(3, 1, 30), Position = interiorPos + Vector3.new(x, 2.5, 0), Color = WOOD, Material = Enum.Material.Wood }, bunker)
+	end
+
+	local exitLadder = makePart({
+		Name = "ExitLadder",
+		Size = Vector3.new(5, 14, 1.2),
+		Position = interiorPos + Vector3.new(0, 7, 22),
+		Color = Color3.fromRGB(240, 200, 30),
+		Material = Enum.Material.DiamondPlate,
+	}, bunker)
 
 	local exitPrompt = Instance.new("ProximityPrompt")
 	exitPrompt.ObjectText = "Surface Hatch"
@@ -359,93 +647,161 @@ local function buildUndergroundStormBunker(parent: Folder)
 		end
 	end)
 
-	-- Safe Volume Tag for ZonePlus & Physics Engine
-	local safeVolume = Instance.new("Part")
-	safeVolume.Name = "BunkerSafeVolume"
-	safeVolume.Size = Vector3.new(46, 15, 46)
-	safeVolume.Position = interiorPos + Vector3.new(0, 8, 0)
-	safeVolume.Anchored = true
-	safeVolume.Transparency = 1
-	safeVolume.CanCollide = false
+	-- Safe volume tag for ZonePlus & physics engine
+	local safeVolume = makePart({
+		Name = "BunkerSafeVolume",
+		Size = Vector3.new(46, 15, 46),
+		Position = interiorPos + Vector3.new(0, 8, 0),
+		Transparency = 1,
+		CanCollide = false,
+	}, bunker)
 	CollectionService:AddTag(safeVolume, "StormBunker")
-	safeVolume.Parent = bunker
 
 	bunker.Parent = parent
 end
 
--- --- GIGANTIC MASSIVE EF5 WEDGE TORNADO MODEL ---
-local function buildGiganticWedgeTornado(parent: Folder): (Model, BasePart)
+-- --- EF5 WEDGE TORNADO MODEL ---
+local function smokeEmitter(props: { [string]: any }): ParticleEmitter
+	local emitter = Instance.new("ParticleEmitter")
+	emitter.Texture = SMOKE_TEXTURE
+	emitter.LightInfluence = 1
+	emitter.Rotation = NumberRange.new(0, 360)
+	emitter.RotSpeed = NumberRange.new(-40, 40)
+	for key, value in props do
+		(emitter :: any)[key] = value
+	end
+	return emitter
+end
+
+local function buildWedgeTornado(parent: Instance): (Model, BasePart)
 	local model = Instance.new("Model")
 	model.Name = "FunnelRunnersVortex"
 
-	-- Root placed on the highway in plain view!
-	local root = Instance.new("Part")
-	root.Name = "VortexRoot"
-	root.Size = Vector3.new(14, 4, 14)
-	root.Position = Vector3.new(0, 2, -60) -- RIGHT DOWN THE HIGHWAY, PLAINLY VISIBLE!
-	root.Anchored = true
-	root.CanCollide = false
-	root.Transparency = 1
-	root.Parent = model
+	-- TornadoManager moves this part; everything else is welded to it and follows along
+	local root = makePart({
+		Name = "VortexRoot",
+		Size = Vector3.new(14, 4, 14),
+		Position = Vector3.new(0, 2, -60),
+		CanCollide = false,
+		Transparency = 1,
+	}, model)
 	model.PrimaryPart = root
 
-	-- Ground Condensation & Violent Dust Storm Emitter
-	local dustEmitter = Instance.new("ParticleEmitter")
-	dustEmitter.Name = "WedgeDustCloud"
-	dustEmitter.Rate = 350
-	dustEmitter.Lifetime = NumberRange.new(2.5, 5)
-	dustEmitter.Speed = NumberRange.new(45, 95)
-	dustEmitter.SpreadAngle = Vector2.new(180, 75)
-	dustEmitter.Size = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 18),
-		NumberSequenceKeypoint.new(0.3, 45),
-		NumberSequenceKeypoint.new(0.7, 75),
-		NumberSequenceKeypoint.new(1, 110),
-	})
-	dustEmitter.Transparency = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 0.2),
-		NumberSequenceKeypoint.new(0.6, 0.45),
-		NumberSequenceKeypoint.new(1, 1),
-	})
-	dustEmitter.Color = ColorSequence.new(Color3.fromRGB(75, 75, 78))
-	dustEmitter.Parent = root
-
-	-- Multi-tier Massive Expanding Funnel Mesh Layers (True EF5 Wedge!)
-	-- Expanding from 35 studs at base to 200 studs at top, 240 studs high!
-	local wedgeLayers = {
-		{ Height = 8,   Radius = 38,  Transparency = 0.25 },
-		{ Height = 25,  Radius = 55,  Transparency = 0.30 },
-		{ Height = 50,  Radius = 78,  Transparency = 0.35 },
-		{ Height = 85,  Radius = 110, Transparency = 0.40 },
-		{ Height = 130, Radius = 150, Transparency = 0.45 },
-		{ Height = 180, Radius = 195, Transparency = 0.50 },
-	}
-
-	for i, layer in wedgeLayers do
-		local funnelPart = Instance.new("Part")
-		funnelPart.Name = "WedgeLayer_" .. i
-		funnelPart.Shape = Enum.PartType.Cylinder
-		funnelPart.Size = Vector3.new(16, layer.Radius, layer.Radius)
-		funnelPart.CFrame = CFrame.new(root.Position + Vector3.new(0, layer.Height, 0)) * CFrame.Angles(0, 0, math.rad(90))
-		funnelPart.Anchored = true
-		funnelPart.CanCollide = false
-		funnelPart.Transparency = layer.Transparency
-		funnelPart.Color = Color3.fromRGB(45, 48, 55)
-		funnelPart.Material = Enum.Material.Smoke
-		funnelPart.Parent = model
-
-		-- Add swirling cloud particles to each layer
-		local cloudEmitter = Instance.new("ParticleEmitter")
-		cloudEmitter.Rate = 45
-		cloudEmitter.Lifetime = NumberRange.new(2, 4)
-		cloudEmitter.Speed = NumberRange.new(20, 50)
-		cloudEmitter.Size = NumberSequence.new(25, 45)
-		cloudEmitter.Transparency = NumberSequence.new(0.4, 1)
-		cloudEmitter.Color = ColorSequence.new(Color3.fromRGB(50, 52, 60))
-		cloudEmitter.Parent = funnelPart
+	local function attachVisual(part: BasePart)
+		part.Anchored = false
+		part.CanCollide = false
+		part.CanTouch = false
+		part.CanQuery = false
+		part.Massless = true
+		part.CastShadow = false
+		local weld = Instance.new("WeldConstraint")
+		weld.Part0 = root
+		weld.Part1 = part
+		weld.Parent = part
 	end
 
-	-- Howling Roar Audio
+	-- Funnel: 22 stacked rings, a wide wedge at the ground flaring out toward the cloud base
+	local LAYERS, LAYER_HEIGHT = 22, 10
+	for i = 0, LAYERS - 1 do
+		local h = i * LAYER_HEIGHT
+		local t = i / (LAYERS - 1)
+		local radius = 34 + (t ^ 1.6) * 90
+		local layer = makePart({
+			Name = "FunnelLayer_" .. i,
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(LAYER_HEIGHT + 0.5, radius * 2, radius * 2),
+			CFrame = root.CFrame * CFrame.new(0, h + LAYER_HEIGHT / 2, 0) * CFrame.Angles(0, 0, math.rad(90)),
+			Color = Color3.fromRGB(78, 72, 66):Lerp(Color3.fromRGB(58, 62, 70), t),
+			Transparency = 0.35 - t * 0.2,
+			Material = Enum.Material.SmoothPlastic,
+		}, model)
+		attachVisual(layer)
+
+		-- Smoke puffs off the funnel surface soften the stacked edges
+		if i % 2 == 0 then
+			smokeEmitter({
+				Shape = Enum.ParticleEmitterShape.Sphere,
+				ShapeStyle = Enum.ParticleEmitterShapeStyle.Surface,
+				ShapeInOut = Enum.ParticleEmitterShapeInOut.Outward,
+				Rate = 14,
+				Lifetime = NumberRange.new(2, 3),
+				Speed = NumberRange.new(2, 6),
+				Size = NumberSequence.new(math.min(radius * 0.5, 45), math.min(radius * 0.8, 60)),
+				Transparency = NumberSequence.new(0.45, 1),
+				Color = ColorSequence.new(layer.Color),
+			}).Parent = layer
+		end
+	end
+
+	-- Dark wall cloud the funnel hangs from
+	for _, cloud in {
+		{ Height = 218, Diameter = 300, Thickness = 10 },
+		{ Height = 230, Diameter = 560, Thickness = 14 },
+	} do
+		local disc = makePart({
+			Name = "WallCloud",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(cloud.Thickness, cloud.Diameter, cloud.Diameter),
+			CFrame = root.CFrame * CFrame.new(0, cloud.Height, 0) * CFrame.Angles(0, 0, math.rad(90)),
+			Color = Color3.fromRGB(55, 58, 65),
+			Transparency = 0.08,
+			Material = Enum.Material.SmoothPlastic,
+		}, model)
+		attachVisual(disc)
+	end
+
+	-- Swirling streaks: emitters around the funnel fire sideways, all in the same direction of rotation
+	for _, ring in { 15, 50, 95, 150, 200 } do
+		local t = ring / ((LAYERS - 1) * LAYER_HEIGHT)
+		local radius = 34 + (t ^ 1.6) * 90 + 4
+		for k = 1, 6 do
+			local angle = k * math.pi / 3
+			local radial = Vector3.new(math.cos(angle), 0, math.sin(angle))
+			local tangent = Vector3.new(-radial.Z, 0, radial.X)
+			local attachment = Instance.new("Attachment")
+			attachment.Name = "SwirlEmitter"
+			attachment.CFrame = CFrame.fromMatrix(radial * radius + Vector3.new(0, ring, 0), radial, tangent)
+			attachment.Parent = root
+			smokeEmitter({
+				EmissionDirection = Enum.NormalId.Top, -- attachment's Y axis = tangent
+				Rate = 6,
+				Lifetime = NumberRange.new(1.5, 2.5),
+				Speed = NumberRange.new(30, 50),
+				Drag = 1.5,
+				SpreadAngle = Vector2.new(15, 15),
+				Size = NumberSequence.new(10 + radius * 0.15, 20 + radius * 0.25),
+				Transparency = NumberSequence.new(0.35, 1),
+				Color = ColorSequence.new(Color3.fromRGB(75, 75, 80)),
+			}).Parent = attachment
+		end
+	end
+
+	-- Ground debris cloud at the base
+	local dustAttachment = Instance.new("Attachment")
+	dustAttachment.Name = "DebrisCloud"
+	dustAttachment.Position = Vector3.new(0, 4, 0)
+	dustAttachment.Parent = root
+	smokeEmitter({
+		Rate = 60,
+		Lifetime = NumberRange.new(3, 5),
+		Speed = NumberRange.new(25, 45),
+		SpreadAngle = Vector2.new(80, 80),
+		Acceleration = Vector3.new(0, 6, 0),
+		Drag = 1.2,
+		RotSpeed = NumberRange.new(-60, 60),
+		Size = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 20),
+			NumberSequenceKeypoint.new(1, 70),
+		}),
+		Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.3),
+			NumberSequenceKeypoint.new(0.6, 0.5),
+			NumberSequenceKeypoint.new(1, 1),
+		}),
+		Color = ColorSequence.new(Color3.fromRGB(95, 82, 68), Color3.fromRGB(70, 65, 60)),
+	}).Parent = dustAttachment
+
+	-- Howling roar audio
 	local roar = Instance.new("Sound")
 	roar.Name = "TornadoRoarAudio"
 	roar.SoundId = "rbxassetid://9114223171"
@@ -461,20 +817,23 @@ local function buildGiganticWedgeTornado(parent: Folder): (Model, BasePart)
 end
 
 local function initializeWorld()
-	setupBrightStormAtmosphere()
+	removeTemplateParts()
+	setupStormLighting()
+	buildTerrain()
 
 	local worldFolder = Workspace:FindFirstChild("FunnelRunnersWorld") or Instance.new("Folder")
 	worldFolder.Name = "FunnelRunnersWorld"
 	worldFolder.Parent = Workspace
 	worldFolder:ClearAllChildren()
 
-	buildHighwayAndPrairie(worldFolder)
+	buildHighway(worldFolder)
 	buildChaserSpawnBase(worldFolder)
-	buildDestructibleFarmhouse(worldFolder)
+	buildFarm(worldFolder)
+	buildScenery(worldFolder)
 	buildUndergroundStormBunker(worldFolder)
-	buildGiganticWedgeTornado(worldFolder)
+	buildWedgeTornado(worldFolder)
 
-	print("[FunnelRunnersWorld] Clear-view storm world with GIGANTIC EF5 WEDGE TORNADO loaded.")
+	print("[FunnelRunnersWorld] Storm world with EF5 wedge tornado loaded.")
 end
 
 initializeWorld()
