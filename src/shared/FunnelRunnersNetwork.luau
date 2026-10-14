@@ -52,6 +52,9 @@ local FunnelRunnersNetwork = {
 	SirenState = getRemote("SirenState"),
 	RoundStateChanged = getRemote("RoundStateChanged"),
 	StormAlert = getRemote("StormAlert"),
+	DeployProbeRequest = getRemote("DeployProbeRequest"),
+	TruckNitroRequest = getRemote("TruckNitroRequest"),
+	TruckAnchorRequest = getRemote("TruckAnchorRequest"),
 }
 
 return FunnelRunnersNetwork

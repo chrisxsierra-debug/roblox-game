@@ -184,20 +184,69 @@ local function buildDrivableChaserTruck(spawnCFrame: CFrame): Model
 	angularVel.Attachment0 = att
 	angularVel.Parent = chassis
 
+	-- Nitrous Exhaust Emitters
+	local nitroEmitters = {}
+	for _, xOffset in { -2.5, 2.5 } do
+		local pipe = Instance.new("Part")
+		pipe.Name = "ExhaustPipe"
+		pipe.Size = Vector3.new(0.6, 0.6, 1.2)
+		pipe.CFrame = chassis.CFrame * CFrame.new(xOffset, -1, 9.2)
+		pipe.Color = Color3.fromRGB(50, 50, 55)
+		pipe.Material = Enum.Material.Metal
+		pipe.CanCollide = false
+		pipe.Parent = truck
+
+		local weldPipe = Instance.new("WeldConstraint")
+		weldPipe.Part0 = chassis
+		weldPipe.Part1 = pipe
+		weldPipe.Parent = chassis
+
+		local flame = Instance.new("ParticleEmitter")
+		flame.Texture = "rbxasset://textures/particles/fire_main.dds"
+		flame.Color = ColorSequence.new(Color3.fromRGB(0, 180, 255), Color3.fromRGB(255, 255, 255))
+		flame.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.8), NumberSequenceKeypoint.new(1, 0.1) })
+		flame.Lifetime = NumberRange.new(0.15, 0.3)
+		flame.Speed = NumberRange.new(20, 35)
+		flame.Rate = 0
+		flame.EmissionDirection = Enum.NormalId.Back
+		flame.Parent = pipe
+		table.insert(nitroEmitters, flame)
+	end
+
+	-- Nitro & Anchor state attributes
+	truck:SetAttribute("NitroActive", false)
+	truck:SetAttribute("AnchoredSpikes", false)
+	truck:SetAttribute("LastNitro", 0)
+
 	-- Connect Driver Input
 	RunService.Heartbeat:Connect(function(dt)
 		if not truck.Parent then return end
 
+		local isAnchored = truck:GetAttribute("AnchoredSpikes") == true
+		if isAnchored then
+			chassis.Anchored = true
+			linearVel.LineVelocity = 0
+			angularVel.AngularVelocity = Vector3.zero
+			return
+		else
+			chassis.Anchored = false
+		end
+
 		local throttle = seat.ThrottleFloat
 		local steer = seat.SteerFloat
+		local isNitro = truck:GetAttribute("NitroActive") == true
 
+		local topSpeed = isNitro and 115 or 65
 		linearVel.LineDirection = chassis.CFrame.LookVector
-		linearVel.LineVelocity = -throttle * 65
+		linearVel.LineVelocity = -throttle * topSpeed
 
-		angularVel.AngularVelocity = Vector3.new(0, -steer * 2.2, 0)
+		angularVel.AngularVelocity = Vector3.new(0, -steer * (isNitro and 1.5 or 2.2), 0)
 
 		-- Engine Sound dynamic pitch
-		if math.abs(throttle) > 0.05 then
+		if isNitro then
+			engineSound.PlaybackSpeed = 1.6
+			engineSound.Volume = 1.8
+		elseif math.abs(throttle) > 0.05 then
 			engineSound.PlaybackSpeed = 0.9 + math.abs(throttle) * 0.6
 			engineSound.Volume = 1.4
 		else
@@ -213,10 +262,71 @@ local function buildDrivableChaserTruck(spawnCFrame: CFrame): Model
 	return truck
 end
 
--- Spawn truck parked right in front of player spawn
+-- Network Listeners for Nitro & Anchors
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Network = require(Shared:WaitForChild("FunnelRunnersNetwork"))
+
+Network.TruckNitroRequest.OnServerEvent:Connect(function(player: Player)
+	local char = player.Character
+	if not char then return end
+	local humanoid = char:FindFirstChildOfClass("Humanoid")
+	if not humanoid or not humanoid.SeatPart or humanoid.SeatPart.Name ~= "DriverSeat" then return end
+
+	local truck = humanoid.SeatPart.Parent :: Model?
+	if not truck then return end
+
+	local now = os.clock()
+	local lastNitro = truck:GetAttribute("LastNitro") or 0
+	if now - lastNitro < 9 then return end -- Cooldown
+
+	truck:SetAttribute("LastNitro", now)
+	truck:SetAttribute("NitroActive", true)
+
+	for _, pipe in truck:GetChildren() do
+		if pipe.Name == "ExhaustPipe" then
+			local flame = pipe:FindFirstChildOfClass("ParticleEmitter")
+			if flame then flame.Rate = 90 end
+		end
+	end
+
+	task.delay(3.5, function()
+		if truck and truck.Parent then
+			truck:SetAttribute("NitroActive", false)
+			for _, pipe in truck:GetChildren() do
+				if pipe.Name == "ExhaustPipe" then
+					local flame = pipe:FindFirstChildOfClass("ParticleEmitter")
+					if flame then flame.Rate = 0 end
+				end
+			end
+		end
+	end)
+end)
+
+Network.TruckAnchorRequest.OnServerEvent:Connect(function(player: Player)
+	local char = player.Character
+	if not char then return end
+	local humanoid = char:FindFirstChildOfClass("Humanoid")
+	if not humanoid or not humanoid.SeatPart or humanoid.SeatPart.Name ~= "DriverSeat" then return end
+
+	local truck = humanoid.SeatPart.Parent :: Model?
+	if not truck then return end
+
+	local currentlyAnchored = truck:GetAttribute("AnchoredSpikes") == true
+	truck:SetAttribute("AnchoredSpikes", not currentlyAnchored)
+end)
+
+-- Spawn dual trucks parked side-by-side for you and your friend!
 task.defer(function()
-	local truckPos = CFrame.new(12, 1.5, 95) * CFrame.Angles(0, math.rad(180), 0)
-	buildDrivableChaserTruck(truckPos)
-	print("[StormChaserTruckService] Drivable Storm Chaser Truck spawned on highway.")
+	local truckPos1 = CFrame.new(12, 1.5, 95) * CFrame.Angles(0, math.rad(180), 0)
+	local truckPos2 = CFrame.new(-12, 1.5, 95) * CFrame.Angles(0, math.rad(180), 0)
+
+	local t1 = buildDrivableChaserTruck(truckPos1)
+	t1.Name = "StormChaserTruck_Alpha"
+
+	local t2 = buildDrivableChaserTruck(truckPos2)
+	t2.Name = "StormChaserTruck_Bravo"
+
+	print("[StormChaserTruckService] Dual Storm Chaser Trucks (Alpha & Bravo) spawned on highway.")
 end)
 
