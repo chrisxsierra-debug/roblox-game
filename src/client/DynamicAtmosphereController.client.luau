@@ -207,22 +207,29 @@ Network.LightningStrike.OnClientEvent:Connect(function(_strikePos)
 end)
 
 -- Find VortexRoot
-local function getVortexRoot(): BasePart?
-	local wf = Workspace:FindFirstChild("FunnelRunnersWorld")
-	if wf then
-		local vm = wf:FindFirstChild("FunnelRunnersVortex")
-		if vm then
-			return vm:FindFirstChild("VortexRoot") :: BasePart?
+-- Find Closest Storm Distance across all active vortices
+local function getClosestStormDistance(playerPos: Vector3): number?
+	local stormFolder = ReplicatedStorage:FindFirstChild("StormState")
+	if not stormFolder then return nil end
+
+	local closestDist: number? = nil
+	for _, child in stormFolder:GetChildren() do
+		local pos = child:GetAttribute("Position")
+		if typeof(pos) == "Vector3" then
+			local d = (playerPos - pos).Magnitude
+			if closestDist == nil or d < closestDist then
+				closestDist = d
+			end
 		end
 	end
-	return nil
+	return closestDist
 end
 
 -- Proximity loop
 local lastUpdate = 0
 RunService.RenderStepped:Connect(function(dt)
 	lastUpdate += dt
-	if lastUpdate < 0.5 then return end
+	if lastUpdate < 0.3 then return end
 	lastUpdate = 0
 
 	local char = player.Character
@@ -230,18 +237,16 @@ RunService.RenderStepped:Connect(function(dt)
 	local root = char:FindFirstChild("HumanoidRootPart") :: BasePart?
 	if not root then return end
 
-	local vortex = getVortexRoot()
-	if not vortex then
+	local dist = getClosestStormDistance(root.Position)
+	if not dist then
 		applyPreset("FairWeather", 3)
 		windSound.Volume = 0.1
 		return
 	end
 
-	local dist = (root.Position - vortex.Position).Magnitude
-
 	-- Scale wind audio smoothly based on distance
-	local targetWindVol = math.clamp(1.5 - (dist / 400), 0.1, 1.2)
-	TweenService:Create(windSound, TweenInfo.new(0.5), { Volume = targetWindVol }):Play()
+	local targetWindVol = math.clamp(1.4 - (dist / 400), 0.1, 1.2)
+	TweenService:Create(windSound, TweenInfo.new(0.4), { Volume = targetWindVol }):Play()
 
 	-- Preset selection based on distance
 	if dist < 120 then

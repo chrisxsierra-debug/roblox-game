@@ -112,11 +112,41 @@ task.spawn(function()
 	end
 end)
 
--- Safe shutdown
-game:BindToClose(function()
-	for player in sessionCache do
-		saveData(player)
-	end
+-- Reward surviving players when the storm cycle enters Intermission
+task.spawn(function()
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	local stormState = ReplicatedStorage:WaitForChild("StormState", 15)
+	if not stormState then return end
+
+	local previousPhase = stormState:GetAttribute("Phase")
+	stormState:GetAttributeChangedSignal("Phase"):Connect(function()
+		local newPhase = stormState:GetAttribute("Phase")
+		if (previousPhase == "Final" or previousPhase == "Minor") and newPhase == "Intermission" then
+			-- Storm cleared! Award living players
+			for _, player in Players:GetPlayers() do
+				local char = player.Character
+				if char then
+					local humanoid = char:FindFirstChildOfClass("Humanoid")
+					if humanoid and humanoid.Health > 0 then
+						local leaderstats = player:FindFirstChild("leaderstats")
+						if leaderstats then
+							local pointsVal = leaderstats:FindFirstChild("ResearchPoints")
+							if pointsVal and pointsVal:IsA("IntValue") then
+								pointsVal.Value += 100
+							end
+							local survVal = leaderstats:FindFirstChild("Survivals")
+							if survVal and survVal:IsA("IntValue") then
+								survVal.Value += 1
+							end
+						end
+					end
+				end
+			end
+			print("[PlayerDataService] Awarded +100 ResearchPoints to all storm survivors!")
+		end
+		previousPhase = newPhase
+	end)
 end)
 
-print("[PlayerDataService] Player data persistence service active.")
+print("[PlayerDataService] Player data persistence & storm rewards active.")
+
